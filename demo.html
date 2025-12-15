@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>shio-walk - ウォーキング管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 24px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+
+        .auth-section {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .btn-secondary {
+            background: #718096;
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .walk-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .walk-input {
+            flex: 1;
+        }
+
+        .reward-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .reward-item {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .reward-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .reward-info {
+            flex: 1;
+        }
+
+        .reward-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .reward-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .reward-date {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .status {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .status.info {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .current-walk {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .walk-info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 16px;
+        }
+
+        .walk-stat {
+            text-align: center;
+        }
+
+        .walk-stat-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .walk-stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚶 shio-walk</h1>
+
+        <!-- 認証セクション -->
+        <div id="auth-card" class="card">
+            <h2>ログイン</h2>
+            <div class="auth-section">
+                <input type="email" id="email" placeholder="メールアドレス" value="test@example.com">
+            </div>
+            <div class="auth-section">
+                <input type="password" id="password" placeholder="パスワード" value="password123">
+            </div>
+            <button class="btn-primary" style="width: 100%;" onclick="login()">ログイン</button>
+            <div id="auth-status" class="status hidden"></div>
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div id="main-content" class="hidden">
+            <!-- 統計情報 -->
+            <div class="card">
+                <h2>統計情報</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="total-steps">0</div>
+                        <div class="stat-label">総歩数</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="total-distance">0</div>
+                        <div class="stat-label">総距離(km)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="total-walks">0</div>
+                        <div class="stat-label">ウォーク回数</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 現在のウォーク -->
+            <div id="current-walk-card" class="card hidden">
+                <div class="current-walk">
+                    <h2 style="color: white; margin-bottom: 16px;">現在のウォーク</h2>
+                    <div class="walk-info">
+                        <div class="walk-stat">
+                            <div class="walk-stat-value" id="current-steps">0</div>
+                            <div class="walk-stat-label">歩数</div>
+                        </div>
+                        <div class="walk-stat">
+                            <div class="walk-stat-value" id="current-distance">0</div>
+                            <div class="walk-stat-label">距離(km)</div>
+                        </div>
+                    </div>
+                    <div class="walk-controls">
+                        <input type="number" id="steps-input" class="walk-input" placeholder="歩数" value="1000">
+                        <input type="number" id="distance-input" class="walk-input" placeholder="距離(km)" value="0.8" step="0.1">
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn-success" style="flex: 1;" onclick="updateWalk()">更新</button>
+                        <button class="btn-danger" style="flex: 1;" onclick="completeWalk()">完了</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ウォーク操作 -->
+            <div id="walk-controls-card" class="card">
+                <button class="btn-primary" style="width: 100%;" onclick="startWalk()">ウォーク開始</button>
+            </div>
+
+            <!-- 報酬 -->
+            <div class="card">
+                <h2>獲得した報酬 🏆</h2>
+                <div id="rewards-list" class="reward-list">
+                    <p style="text-align: center; color: #999;">まだ報酬がありません</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let token = null;
+        let currentWalkId = null;
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.token) {
+                    token = data.token;
+                    showStatus('auth-status', 'ログイン成功！', 'success');
+                    document.getElementById('auth-card').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('hidden');
+                    loadData();
+                } else {
+                    showStatus('auth-status', 'ログイン失敗: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showStatus('auth-status', 'エラー: ' + error.message, 'error');
+            }
+        }
+
+        async function loadData() {
+            await loadStats();
+            await loadRewards();
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_URL}/stats`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                document.getElementById('total-steps').textContent = data.total_steps.toLocaleString();
+                document.getElementById('total-distance').textContent = data.total_distance_km.toFixed(2);
+                document.getElementById('total-walks').textContent = data.total_walks;
+            } catch (error) {
+                console.error('統計情報の取得に失敗:', error);
+            }
+        }
+
+        async function loadRewards() {
+            try {
+                const response = await fetch(`${API_URL}/rewards/unlocked`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                
+                const rewardsList = document.getElementById('rewards-list');
+                
+                if (data.rewards && data.rewards.length > 0) {
+                    rewardsList.innerHTML = data.rewards.map(reward => `
+                        <div class="reward-item">
+                            <div class="reward-icon">🏆</div>
+                            <div class="reward-info">
+                                <div class="reward-title">${reward.title}</div>
+                                <div class="reward-desc">${reward.description}</div>
+                                <div class="reward-date">獲得日時: ${new Date(reward.unlocked_at).toLocaleString('ja-JP')}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    rewardsList.innerHTML = '<p style="text-align: center; color: #999;">まだ報酬がありません</p>';
+                }
+            } catch (error) {
+                console.error('報酬情報の取得に失敗:', error);
+            }
+        }
+
+        async function startWalk() {
+            try {
+                const response = await fetch(`${API_URL}/walks/start`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.walk) {
+                    currentWalkId = data.walk.id;
+                    document.getElementById('current-walk-card').classList.remove('hidden');
+                    document.getElementById('walk-controls-card').classList.add('hidden');
+                    document.getElementById('current-steps').textContent = '0';
+                    document.getElementById('current-distance').textContent = '0';
+                }
+            } catch (error) {
+                alert('ウォーク開始に失敗しました: ' + error.message);
+            }
+        }
+
+        async function updateWalk() {
+            const steps = parseInt(document.getElementById('steps-input').value);
+            const distance = parseFloat(document.getElementById('distance-input').value);
+            
+            try {
+                const response = await fetch(`${API_URL}/walks/${currentWalkId}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ steps, distance })
+                });
+                const data = await response.json();
+                
+                if (data.walk) {
+                    document.getElementById('current-steps').textContent = data.walk.steps.toLocaleString();
+                    document.getElementById('current-distance').textContent = (data.walk.distance_meters / 1000).toFixed(2);
+                }
+            } catch (error) {
+                alert('ウォーク更新に失敗しました: ' + error.message);
+            }
+        }
+
+        async function completeWalk() {
+            try {
+                const response = await fetch(`${API_URL}/walks/${currentWalkId}/complete`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.walk) {
+                    alert('ウォーク完了！お疲れ様でした！');
+                    currentWalkId = null;
+                    document.getElementById('current-walk-card').classList.add('hidden');
+                    document.getElementById('walk-controls-card').classList.remove('hidden');
+                    await loadData();
+                }
+            } catch (error) {
+                alert('ウォーク完了に失敗しました: ' + error.message);
+            }
+        }
+
+        function showStatus(elementId, message, type) {
+            const statusEl = document.getElementById(elementId);
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusEl.classList.add('hidden');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

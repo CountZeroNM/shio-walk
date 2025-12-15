@@ -1,0 +1,37 @@
+{
+  "title": "shio-walk バックエンドAPI テストレポート (2025/12/05)",
+  "summary": "ユーザーのウォーク（歩行活動）に関連するAPIエンドポイント群（更新、完了、統計、報酬）のテストを実施しました。全体として主要な機能は動作していますが、APIの利用者が混乱しやすい問題が1件、および将来的な改善点が1件発見されました。",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "High",
+      "type": "API Usability / Documentation",
+      "description": "ウォーク更新APIが期待するリクエストボディのキー名が直感的でないため、エラーを引き起こしやすい。",
+      "details": "PUT /api/walks/:id エンドポイントは、距離を更新するために `distance_meters` というキーを期待しています。しかし、クライアントが直感的に `distance` というキーでリクエストを送信すると、APIは `400 Bad Request` を返し、エラーメッセージ `{\"error\":\"steps and distance_meters are required\"}` が表示されます。このメッセージは根本原因（キー名の誤り）を直接示しておらず、開発者が問題解決に時間を要する可能性があります。",
+      "affected_api": {
+        "method": "PUT",
+        "endpoint": "/api/walks/:id"
+      },
+      "recommendation": "APIのドキュメントを整備し、リクエストボディに `distance_meters` が必須であることを明確に記載してください。可能であれば、API側で未知のキー `distance` を検出した場合に、より具体的なエラーメッセージ（例: 'Unknown key \"distance\", did you mean \"distance_meters\"?'）を返すように実装を改善することも推奨します。"
+    },
+    {
+      "id": 2,
+      "severity": "Medium",
+      "type": "API Consistency",
+      "description": "API間で距離を表す単位がメートル(m)とキロメートル(km)で混在している。",
+      "details": "ウォーク更新API (`PUT /api/walks/:id`) は距離をメートル単位の `distance_meters` で受け取りますが、統計情報取得API (`GET /api/stats`) は総距離をキロメートル単位の `total_distance_km` で返します。このように単位が混在していると、API利用者が単位変換を誤るなど、バグの原因となり得ます。",
+      "affected_api": [
+        {
+          "method": "PUT",
+          "endpoint": "/api/walks/:id"
+        },
+        {
+          "method": "GET",
+          "endpoint": "/api/stats"
+        }
+      ],
+      "recommendation": "API全体で距離の単位を統一する（例: すべてメートル）ことを強く推奨します。あるいは、後方互互換性を維持する必要がある場合は、キー名で単位をより厳密に明示する（例: `total_distance_in_kilometers`）など、一貫性を高めるための改善を検討してください。"
+    }
+  ],
+  "overall_status": "大部分の機能は正常に動作していますが、ユーザビリティと一貫性に関する上記の問題点について対応を推奨します。"
+}

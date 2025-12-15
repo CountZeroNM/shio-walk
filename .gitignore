@@ -1,0 +1,49 @@
+# Clojure
+.cpcache/
+.nrepl-port
+.rebel_readline_history
+*.jar
+*.class
+/target/
+/classes/
+/checkouts/
+profiles.clj
+pom.xml
+pom.xml.asg
+*.iml
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Backup files
+*.backup.*
+
+# Docker volumes
+/postgres-data/
+
+# ClojureScript
+/resources/public/js/
+node_modules/
+.shadow-cljs/
+
+# Temporary files
+/tmp/

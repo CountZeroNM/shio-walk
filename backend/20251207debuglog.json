@@ -1,0 +1,13 @@
+{
+  "title": "shio-walk バックエンド起動不具合レポート (2025/12/07)",
+  "issue": {
+    "id": 1,
+    "description": "サーバー起動時のクラスパスエラー",
+    "symptom": "`./run.sh` を使用してサーバーを起動しようとすると、`Execution error (FileNotFoundException)` が発生し、`Could not locate clojure/java/jdbc__init.class` というメッセージが表示され、起動に失敗する。",
+    "root_cause": "`src/shio_walk/walks/handlers.clj` ファイルが、意図せず古い、または互換性のないバージョンのコードに置き換えられていた。この古いコードには、プロジェクトの依存関係 (`deps.edn`) に含まれていない `clojure.java.jdbc` ライブラリへの `require` 文が含まれていたため、クラスパス上でライブラリが見つからず、`FileNotFoundException` が発生していた。",
+    "resolution": {
+      "file": "src/shio_walk/walks/handlers.clj",
+      "change": "ファイルを、以前のテストで正常に動作していたバージョンに上書きして戻した。これにより、不要なライブラリ参照が削除され、サーバーが正常に起動するようになった。"
+    }
+  }
+}

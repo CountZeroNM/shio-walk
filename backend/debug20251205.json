@@ -1,0 +1,25 @@
+{
+  "title": "shio-walk バックエンド修正レポート (2025/12/05)",
+  "issues": [
+    {
+      "id": 1,
+      "description": "データベース認証失敗",
+      "symptom": "ユーザー登録リクエスト時に、環境変数で指定したユーザーではなく、システムのユーザー名でデータベースに接続しようとし、認証エラー（FATAL: password authentication failed）が発生する。",
+      "root_cause": "データベース接続プール（HikariCP）が、接続設定マップの`:user`キーを正しく解釈せず、デフォルトのユーザー名（システムユーザー名）を使用してしまっていた。`:username`が期待されるキー名であった可能性が高い。",
+      "resolution": {
+        "file": "src/shio_walk/config.clj",
+        "change": "データベース設定マップに`:username`キーを追加し、環境変数`DB_USER`から値を取得するように修正した。"
+      }
+    },
+    {
+      "id": 2,
+      "description": "ユーザー登録時の引数エラー",
+      "symptom": "データベース認証問題の修正後、ユーザー登録リクエスト時に『Wrong number of args』エラーが発生し、ユーザー作成に失敗する。",
+      "root_cause": "`src/shio_walk/db.clj`内のヘルパー関数`execute-one!`が単一の引数のみを受け取る定義だったが、`create-user!`関数がオプションマップを含む2つの引数で呼び出していたため、関数のアリティが一致しなかった。",
+      "resolution": {
+        "file": "src/shio_walk/db.clj",
+        "change": "`execute!`および`execute-one!`関数を、オプションの引数（optsマップ）も受け取れるように、複数のアリティ（multi-arity）を持つ定義に修正した。"
+      }
+    }
+  ]
+}
