@@ -1,0 +1,439 @@
+{
+  "project_name": "shio-walk",
+  "description": "ウォーキング距離管理アプリ - 歩数・距離をカウントし、到達時に報酬（画像・音声）を表示",
+  "github_repository": "https://github.com/YOUR_USERNAME/shio-walk",
+  "last_updated": "2025-12-07",
+  
+  "system_info": {
+    "os": "Linux (Penguin on ChromeOS)",
+    "home_directory": "/home/wiredmarks716",
+    "java_version": "OpenJDK 21",
+    "clojure_cli": "1.12.1.1550",
+    "docker_version": "29.1.2"
+  },
+  
+  "project_structure": {
+    "root": "~/shio-walk/",
+    "github_url": "https://github.com/YOUR_USERNAME/shio-walk.git",
+    "main_directories": {
+      "backend": "~/shio-walk/backend/",
+      "frontend": "~/shio-walk/frontend/ (空)",
+      "resources": "~/shio-walk/backend/resources/",
+      "migrations": "~/shio-walk/backend/resources/migrations/"
+    },
+    "key_files": {
+      "README.md": "プロジェクト説明（ルート）",
+      ".gitignore": "Git除外設定（ルート）",
+      "docker-compose.yml": "Docker設定（ルート）",
+      "demo.html": "簡易WebUI（ルート）",
+      "deps.edn": "backend/deps.edn - 依存関係定義",
+      "run.sh": "backend/run.sh - サーバー起動スクリプト",
+      "config": "backend/src/shio_walk/config.clj",
+      "db": "backend/src/shio_walk/db.clj",
+      "routes": "backend/src/shio_walk/routes.clj",
+      "middleware": "backend/src/shio_walk/middleware.clj",
+      "core": "backend/src/shio_walk/core.clj",
+      "auth_core": "backend/src/shio_walk/auth/core.clj",
+      "auth_handlers": "backend/src/shio_walk/auth/handlers.clj",
+      "walks_handlers": "backend/src/shio_walk/walks/handlers.clj",
+      "rewards_handlers": "backend/src/shio_walk/rewards/handlers.clj"
+    }
+  },
+  
+  "tech_stack": {
+    "backend": {
+      "language": "Clojure 1.11.1",
+      "web_framework": "Ring 1.12.1 + Compojure 1.7.1",
+      "database": "PostgreSQL 15",
+      "database_library": "next.jdbc 1.3.909",
+      "connection_pool": "HikariCP 5.1.0",
+      "authentication": "JWT (Buddy)",
+      "server": "Jetty",
+      "cors": "ring-cors 0.1.13",
+      "json": "ring-json 0.5.1"
+    },
+    "frontend": {
+      "language": "ClojureScript (予定)",
+      "framework": "Reagent + Re-frame (予定)",
+      "status": "未着手"
+    },
+    "infrastructure": {
+      "containerization": "Docker + Docker Compose",
+      "database_container": "postgres:15-alpine"
+    }
+  },
+  
+  "database": {
+    "type": "PostgreSQL 15",
+    "container_name": "shio-walk-db",
+    "connection": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "shio_walk",
+      "user": "shio_user",
+      "password": "shiopass"
+    },
+    "docker_commands": {
+      "start": "docker compose up -d",
+      "stop": "docker compose down",
+      "status": "docker ps",
+      "logs": "docker logs shio-walk-db"
+    },
+    "tables": {
+      "users": {
+        "description": "ユーザー情報",
+        "columns": ["id (UUID)", "email", "username", "password_hash", "created_at", "last_login"]
+      },
+      "walks": {
+        "description": "ウォーキング記録",
+        "columns": ["id (UUID)", "user_id", "steps", "distance_meters", "status", "start_time", "end_time", "created_at", "updated_at"]
+      },
+      "user_stats": {
+        "description": "ユーザー統計情報",
+        "columns": ["id (UUID)", "user_id", "total_steps", "total_distance_km", "total_walks", "rewards_unlocked", "created_at", "updated_at"]
+      },
+      "rewards": {
+        "description": "報酬マスタ",
+        "columns": ["id (UUID)", "threshold_type", "threshold_value", "title", "description", "image_url", "audio_url", "created_at"]
+      },
+      "user_rewards": {
+        "description": "ユーザー獲得報酬",
+        "columns": ["id (UUID)", "user_id", "reward_id", "unlocked_at"]
+      }
+    },
+    "initial_rewards": [
+      {
+        "title": "最初の一歩",
+        "threshold": "1000歩",
+        "description": "1000歩達成おめでとう!"
+      },
+      {
+        "title": "1km走破",
+        "threshold": "1km",
+        "description": "1km歩きました!"
+      },
+      {
+        "title": "頑張り屋さん",
+        "threshold": "5000歩",
+        "description": "5000歩達成!"
+      },
+      {
+        "title": "5km走破",
+        "threshold": "5km",
+        "description": "5km歩きました!すごい!"
+      },
+      {
+        "title": "ウォーキングマスター",
+        "threshold": "10000歩",
+        "description": "10000歩達成!素晴らしい!"
+      }
+    ]
+  },
+  
+  "server_operations": {
+    "start_database": "docker compose up -d",
+    "start_server": "cd ~/shio-walk/backend && ./run.sh",
+    "alternative_start": "cd ~/shio-walk/backend && DB_USER=shio_user DB_PASSWORD=shiopass DB_NAME=shio_walk clj -M:run",
+    "migration": "cd ~/shio-walk/backend && clj -M:migrate migrate",
+    "health_check": "curl http://localhost:3000/api/health",
+    "server_url": "http://localhost:3000"
+  },
+  
+  "api_endpoints": {
+    "base_url": "http://localhost:3000/api",
+    "public": {
+      "register": {
+        "method": "POST",
+        "path": "/auth/register",
+        "description": "ユーザー登録",
+        "body": {
+          "email": "string",
+          "username": "string",
+          "password": "string"
+        }
+      },
+      "login": {
+        "method": "POST",
+        "path": "/auth/login",
+        "description": "ログイン",
+        "body": {
+          "email": "string",
+          "password": "string"
+        },
+        "response": {
+          "token": "JWT token",
+          "user": "ユーザー情報"
+        }
+      },
+      "health": {
+        "method": "GET",
+        "path": "/health",
+        "description": "ヘルスチェック"
+      }
+    },
+    "protected": {
+      "authentication": "Bearer token in Authorization header",
+      "user_profile": {
+        "method": "GET",
+        "path": "/user/profile",
+        "description": "プロフィール取得"
+      },
+      "walks": {
+        "start": {
+          "method": "POST",
+          "path": "/walks/start",
+          "description": "ウォーク開始"
+        },
+        "update": {
+          "method": "PUT",
+          "path": "/walks/:id",
+          "description": "ウォーク更新",
+          "body": {
+            "steps": "integer",
+            "distance": "float (km単位) - 自動的にメートルに変換",
+            "distance_meters": "float (メートル単位) - 直接指定"
+          },
+          "note": "distanceとdistance_metersの両方をサポート。100未満の値はkm単位と判断される"
+        },
+        "complete": {
+          "method": "POST",
+          "path": "/walks/:id/complete",
+          "description": "ウォーク完了・報酬チェック"
+        },
+        "list": {
+          "method": "GET",
+          "path": "/walks",
+          "description": "ウォーク履歴取得"
+        }
+      },
+      "stats": {
+        "method": "GET",
+        "path": "/stats",
+        "description": "統計情報取得",
+        "response": {
+          "total_steps": "累計歩数",
+          "total_distance_km": "累計距離(km)",
+          "total_walks": "ウォーク回数",
+          "rewards_unlocked": "獲得報酬数"
+        }
+      },
+      "rewards": {
+        "all": {
+          "method": "GET",
+          "path": "/rewards",
+          "description": "全報酬一覧"
+        },
+        "unlocked": {
+          "method": "GET",
+          "path": "/rewards/unlocked",
+          "description": "獲得済み報酬"
+        }
+      }
+    }
+  },
+  
+  "test_data": {
+    "test_user": {
+      "email": "test@example.com",
+      "username": "testuser",
+      "password": "password123",
+      "id": "132d7da2-1b14-4e0a-af57-3bfda7eee792",
+      "note": "このユーザーは既に作成済み・テスト済み"
+    },
+    "test_scripts": [
+      "test_api.sh - 基本APIテスト",
+      "test_improved_api.sh - 改善版APIテスト（distanceキー対応）",
+      "test_complete_walk.sh - ウォーク完了と報酬獲得テスト"
+    ]
+  },
+  
+  "completed_milestones": {
+    "phase_1": {
+      "name": "バックエンド開発",
+      "status": "完了",
+      "items": [
+        "✅ プロジェクト構造作成",
+        "✅ PostgreSQL環境構築（Docker）",
+        "✅ データベースマイグレーション",
+        "✅ JWT認証システム",
+        "✅ ユーザー登録・ログインAPI",
+        "✅ ウォーク管理API（開始・更新・完了）",
+        "✅ 報酬システムAPI",
+        "✅ 統計情報API",
+        "✅ 全APIテスト完了"
+      ]
+    },
+    "phase_2": {
+      "name": "API改善とCORS対応",
+      "status": "完了",
+      "items": [
+        "✅ distanceキー（km単位）のサポート追加",
+        "✅ distance_metersキー（m単位）との互換性維持",
+        "✅ 親切なエラーメッセージの実装",
+        "✅ CORS対応（ring-cors導入）",
+        "✅ エラーハンドリングミドルウェア"
+      ]
+    },
+    "phase_3": {
+      "name": "簡易WebUI開発",
+      "status": "完了",
+      "items": [
+        "✅ HTML/CSS/JavaScriptによるデモUI作成",
+        "✅ ログイン機能",
+        "✅ 統計情報表示",
+        "✅ ウォーク管理UI（開始・更新・完了）",
+        "✅ 報酬表示",
+        "✅ レスポンシブデザイン",
+        "✅ 動作確認完了"
+      ]
+    },
+    "phase_4": {
+      "name": "バージョン管理とバックアップ",
+      "status": "完了",
+      "items": [
+        "✅ Gitリポジトリ初期化",
+        "✅ .gitignore作成",
+        "✅ README.md作成",
+        "✅ GitHubリポジトリ作成",
+        "✅ 初回コミット・プッシュ完了"
+      ]
+    }
+  },
+  
+  "pending_tasks": {
+    "priority_high": [
+      "ClojureScriptフロントエンド開発（Reagent + Re-frame）",
+      "Shadow-cljsセットアップ",
+      "SPA（Single Page Application）構築"
+    ],
+    "priority_medium": [
+      "スマートフォンセンサー連携の設計",
+      "Progressive Web App (PWA) 化",
+      "画像・音声報酬の実装（アップロード・配信）"
+    ],
+    "priority_low": [
+      "デプロイ準備（本番環境）",
+      "ユーザー間ランキング機能",
+      "ソーシャル機能",
+      "データエクスポート機能"
+    ]
+  },
+  
+  "known_issues_resolved": [
+    {
+      "issue": "データベース認証失敗",
+      "cause": "HikariCPが:userキーを認識せず",
+      "resolution": "config.cljに:usernameキー追加",
+      "date": "初期開発時"
+    },
+    {
+      "issue": "ユーザー登録時の引数エラー",
+      "cause": "execute-one!が単一アリティのみ",
+      "resolution": "db.cljのexecute!/execute-one!をマルチアリティ化",
+      "date": "初期開発時"
+    },
+    {
+      "issue": "distanceキーが認識されない",
+      "cause": "APIがdistance_metersのみをサポート",
+      "resolution": "walks/handlers.cljでdistanceキー（km）のサポート追加、自動変換機能実装",
+      "date": "2025-12-07"
+    },
+    {
+      "issue": "ブラウザからのfetchエラー",
+      "cause": "CORS設定なし",
+      "resolution": "ring-cors導入、middleware.cljにwrap-cors実装",
+      "date": "2025-12-07"
+    },
+    {
+      "issue": "サーバー起動時のクラスパスエラー",
+      "cause": "Compojureが依存関係にない、誤ったライブラリ参照",
+      "resolution": "deps.ednにCompojure追加、middleware.cljの名前衝突解決",
+      "date": "2025-12-07"
+    }
+  ],
+  
+  "git_workflow": {
+    "clone_repo": "git clone https://github.com/YOUR_USERNAME/shio-walk.git",
+    "check_status": "git status",
+    "add_changes": "git add .",
+    "commit": "git commit -m 'コミットメッセージ'",
+    "push": "git push",
+    "pull": "git pull",
+    "branch_list": "git branch",
+    "create_branch": "git checkout -b feature/new-feature",
+    "switch_branch": "git checkout main",
+    "view_log": "git log --oneline"
+  },
+  
+  "quick_start_new_terminal": {
+    "step_1": "cd ~/shio-walk",
+    "step_2": "docker compose up -d  # データベース起動",
+    "step_3": "cd backend && ./run.sh  # サーバー起動",
+    "step_4": "curl http://localhost:3000/api/health  # 動作確認",
+    "step_5": "xdg-open demo.html  # または chromium demo.html"
+  },
+  
+  "useful_commands": {
+    "database": {
+      "start": "docker compose up -d",
+      "stop": "docker compose down",
+      "restart": "docker compose restart",
+      "logs": "docker logs -f shio-walk-db",
+      "psql_connect": "docker exec -it shio-walk-db psql -U shio_user -d shio_walk"
+    },
+    "server": {
+      "start": "cd ~/shio-walk/backend && ./run.sh",
+      "health_check": "curl http://localhost:3000/api/health",
+      "test_login": "curl -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\": \"test@example.com\", \"password\": \"password123\"}'"
+    },
+    "git": {
+      "status": "git status",
+      "log": "git log --oneline -10",
+      "diff": "git diff",
+      "add_all": "git add .",
+      "commit": "git commit -m 'message'",
+      "push": "git push"
+    }
+  },
+  
+  "troubleshooting": {
+    "database_connection_error": {
+      "error": "Connection to localhost:5432 refused",
+      "solution": "docker compose up -d を実行してPostgreSQLコンテナを起動"
+    },
+    "port_already_in_use": {
+      "error": "Address already in use: bind",
+      "solution": "既存のサーバープロセスを終了するか、別のポートを使用"
+    },
+    "cors_error": {
+      "error": "CORS policy blocked",
+      "solution": "サーバーが正しく起動しているか確認、middleware.cljのwrap-corsが適用されているか確認"
+    }
+  },
+  
+  "next_session_recommendations": [
+    "Option A: ClojureScriptフロントエンド本格開発（推奨）",
+    "Option B: デモUIの機能拡張（グラフ、履歴表示等）",
+    "Option C: PWA化とスマートフォン対応",
+    "Option D: 本番環境へのデプロイ準備"
+  ],
+  
+  "important_notes": {
+    "github_token": "Personal Access Tokenは ~/.github-token に保存済み（chmod 600で保護）",
+    "test_user": "test@example.com / password123 でログイン可能",
+    "cors": "すべてのオリジンからのアクセスを許可（開発環境用、本番では制限必要）",
+    "database": "Dockerコンテナで起動、データは永続化される",
+    "demo_ui": "demo.htmlはfile://プロトコルで開くが、APIはhttp://localhostで通信"
+  },
+  
+  "documentation_links": {
+    "clojure": "https://clojure.org/",
+    "ring": "https://github.com/ring-clojure/ring",
+    "compojure": "https://github.com/weavejester/compojure",
+    "next_jdbc": "https://github.com/seancorfield/next-jdbc",
+    "buddy": "https://funcool.github.io/buddy-auth/latest/",
+    "reagent": "https://reagent-project.github.io/",
+    "re_frame": "https://day8.github.io/re-frame/",
+    "shadow_cljs": "https://shadow-cljs.github.io/docs/UsersGuide.html"
+  }
+}
