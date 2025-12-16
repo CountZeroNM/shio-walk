@@ -1,0 +1,17 @@
+{
+  "name": "shio-walk-frontend",
+  "version": "0.1.0",
+  "description": "Walking distance management app frontend",
+  "scripts": {
+    "dev": "shadow-cljs watch app",
+    "build": "shadow-cljs release app",
+    "server": "shadow-cljs server"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "shadow-cljs": "^2.26.2"
+  }
+}
