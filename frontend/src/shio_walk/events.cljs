@@ -38,104 +38,89 @@
    (assoc db :current-page page :error nil)))
 
 ;; 認証関連
-(rf/reg-event-fx
+(rf/reg-event-db
  :register
- (fn [{:keys [db]} [_ user-data]]
-   {:db (assoc db :loading? true :error nil)
-    :fx [[:register user-data]]}))
-
-(rf/reg-fx
- :register
- (fn [user-data]
+ (fn [db [_ user-data]]
    (api/register
     user-data
     #(rf/dispatch [:register-success %])
-    #(rf/dispatch [:set-error (or (:message %) "登録に失敗しました")]))))
+    #(rf/dispatch [:set-error (or (:message %) "登録に失敗しました")]))
+   (assoc db :loading? true :error nil)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :register-success
- (fn [{:keys [db]} [_ response]]
+ (fn [db [_ response]]
    (.setItem js/localStorage "token" (:token response))
    (.setItem js/localStorage "user" (.stringify js/JSON (clj->js (:user response))))
-   {:db (-> db
-            (assoc :token (:token response)
-                   :user (:user response)
-                   :loading? false
-                   :current-page :dashboard))
-    :fx [[:load-initial-data]]}))
+   (rf/dispatch [:load-initial-data])
+   (-> db
+       (assoc :token (:token response)
+              :user (:user response)
+              :loading? false
+              :current-page :dashboard))))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :login
- (fn [{:keys [db]} [_ credentials]]
-   {:db (assoc db :loading? true :error nil)
-    :fx [[:login credentials]]}))
-
-(rf/reg-fx
- :login
- (fn [credentials]
+ (fn [db [_ credentials]]
    (api/login
     credentials
     #(rf/dispatch [:login-success %])
-    #(rf/dispatch [:set-error (or (:message %) "ログインに失敗しました")]))))
+    #(rf/dispatch [:set-error (or (:message %) "ログインに失敗しました")]))
+   (assoc db :loading? true :error nil)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :login-success
- (fn [{:keys [db]} [_ response]]
+ (fn [db [_ response]]
    (.setItem js/localStorage "token" (:token response))
    (.setItem js/localStorage "user" (.stringify js/JSON (clj->js (:user response))))
-   {:db (-> db
-            (assoc :token (:token response)
-                   :user (:user response)
-                   :loading? false
-                   :current-page :dashboard))
-    :fx [[:load-initial-data]]}))
+   (rf/dispatch [:load-initial-data])
+   (-> db
+       (assoc :token (:token response)
+              :user (:user response)
+              :loading? false
+              :current-page :dashboard))))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :logout
- (fn [{:keys [db]} _]
+ (fn [_ _]
    (.removeItem js/localStorage "token")
    (.removeItem js/localStorage "user")
-   {:db (assoc db/default-db :current-page :login)}))
+   (assoc db/default-db :current-page :login)))
 
 ;; データ読み込み
-(rf/reg-fx
+(rf/reg-event-db
  :load-initial-data
- (fn []
+ (fn [db _]
    (rf/dispatch [:load-stats])
    (rf/dispatch [:load-walks])
    (rf/dispatch [:load-rewards])
-   (rf/dispatch [:load-unlocked-rewards])))
+   (rf/dispatch [:load-unlocked-rewards])
+   db))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :load-stats
- (fn [{:keys [db]} _]
-   {:fx [[:get-stats (:token db)]]}))
-
-(rf/reg-fx
- :get-stats
- (fn [token]
-   (api/get-stats
-    token
-    #(rf/dispatch [:stats-loaded %])
-    #(rf/dispatch [:set-error "統計情報の読み込みに失敗しました"]))))
+ (fn [db _]
+   (let [token (:token db)]
+     (api/get-stats
+      token
+      #(rf/dispatch [:stats-loaded %])
+      #(rf/dispatch [:set-error "統計情報の読み込みに失敗しました"]))
+     db)))
 
 (rf/reg-event-db
  :stats-loaded
  (fn [db [_ stats]]
    (assoc db :stats stats)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :load-walks
- (fn [{:keys [db]} _]
-   {:fx [[:get-walks (:token db)]]}))
-
-(rf/reg-fx
- :get-walks
- (fn [token]
-   (api/get-walks
-    token
-    #(rf/dispatch [:walks-loaded %])
-    #(rf/dispatch [:set-error "ウォーク履歴の読み込みに失敗しました"]))))
+ (fn [db _]
+   (let [token (:token db)]
+     (api/get-walks
+      token
+      #(rf/dispatch [:walks-loaded %])
+      #(rf/dispatch [:set-error "ウォーク履歴の読み込みに失敗しました"]))
+     db)))
 
 (rf/reg-event-db
  :walks-loaded
@@ -145,36 +130,30 @@
             :walks walks
             :current-walk active-walk))))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :load-rewards
- (fn [{:keys [db]} _]
-   {:fx [[:get-rewards (:token db)]]}))
-
-(rf/reg-fx
- :get-rewards
- (fn [token]
-   (api/get-rewards
-    token
-    #(rf/dispatch [:rewards-loaded %])
-    #(rf/dispatch [:set-error "報酬一覧の読み込みに失敗しました"]))))
+ (fn [db _]
+   (let [token (:token db)]
+     (api/get-rewards
+      token
+      #(rf/dispatch [:rewards-loaded %])
+      #(rf/dispatch [:set-error "報酬一覧の読み込みに失敗しました"]))
+     db)))
 
 (rf/reg-event-db
  :rewards-loaded
  (fn [db [_ rewards]]
    (assoc db :rewards rewards)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :load-unlocked-rewards
- (fn [{:keys [db]} _]
-   {:fx [[:get-unlocked-rewards (:token db)]]}))
-
-(rf/reg-fx
- :get-unlocked-rewards
- (fn [token]
-   (api/get-unlocked-rewards
-    token
-    #(rf/dispatch [:unlocked-rewards-loaded %])
-    #(rf/dispatch [:set-error "獲得済み報酬の読み込みに失敗しました"]))))
+ (fn [db _]
+   (let [token (:token db)]
+     (api/get-unlocked-rewards
+      token
+      #(rf/dispatch [:unlocked-rewards-loaded %])
+      #(rf/dispatch [:set-error "獲得済み報酬の読み込みに失敗しました"]))
+     db)))
 
 (rf/reg-event-db
  :unlocked-rewards-loaded
@@ -182,75 +161,58 @@
    (assoc db :unlocked-rewards unlocked-rewards)))
 
 ;; ウォーク操作
-(rf/reg-event-fx
+(rf/reg-event-db
  :start-walk
- (fn [{:keys [db]} _]
-   {:db (assoc db :loading? true)
-    :fx [[:start-walk-api (:token db)]]}))
+ (fn [db _]
+   (let [token (:token db)]
+     (api/start-walk
+      token
+      #(rf/dispatch [:walk-started %])
+      #(rf/dispatch [:set-error "ウォークの開始に失敗しました"]))
+     (assoc db :loading? true))))
 
-(rf/reg-fx
- :start-walk-api
- (fn [token]
-   (api/start-walk
-    token
-    #(rf/dispatch [:walk-started %])
-    #(rf/dispatch [:set-error "ウォークの開始に失敗しました"]))))
-
-(rf/reg-event-fx
+(rf/reg-event-db
  :walk-started
- (fn [{:keys [db]} [_ walk]]
-   {:db (assoc db :current-walk walk :loading? false)
-    :fx [[:load-walks]]}))
+ (fn [db [_ walk]]
+   (rf/dispatch [:load-walks])
+   (assoc db :current-walk walk :loading? false)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :update-walk
- (fn [{:keys [db]} [_ walk-id data]]
-   {:fx [[:update-walk-api [(:token db) walk-id data]]]}))
-
-(rf/reg-fx
- :update-walk-api
- (fn [[token walk-id data]]
-   (api/update-walk
-    token
-    walk-id
-    data
-    #(rf/dispatch [:walk-updated %])
-    #(rf/dispatch [:set-error "ウォークの更新に失敗しました"]))))
+ (fn [db [_ walk-id data]]
+   (let [token (:token db)]
+     (api/update-walk
+      token
+      walk-id
+      data
+      #(rf/dispatch [:walk-updated %])
+      #(rf/dispatch [:set-error "ウォークの更新に失敗しました"]))
+     db)))
 
 (rf/reg-event-db
  :walk-updated
  (fn [db [_ walk]]
    (assoc db :current-walk walk)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :complete-walk
- (fn [{:keys [db]} [_ walk-id]]
-   {:db (assoc db :loading? true)
-    :fx [[:complete-walk-api [(:token db) walk-id]]]}))
+ (fn [db [_ walk-id]]
+   (let [token (:token db)]
+     (api/complete-walk
+      token
+      walk-id
+      #(rf/dispatch [:walk-completed %])
+      #(rf/dispatch [:set-error "ウォークの完了に失敗しました"]))
+     (assoc db :loading? true))))
 
-(rf/reg-fx
- :complete-walk-api
- (fn [[token walk-id]]
-   (api/complete-walk
-    token
-    walk-id
-    #(rf/dispatch [:walk-completed %])
-    #(rf/dispatch [:set-error "ウォークの完了に失敗しました"]))))
-
-(rf/reg-event-fx
+(rf/reg-event-db
  :walk-completed
- (fn [{:keys [db]} [_ result]]
-   {:db (-> db
-            (assoc :current-walk nil :loading? false)
-            (update :stats merge (:stats result)))
-    :fx [[:load-walks]
-         [:load-unlocked-rewards]
-         (when (seq (:new-rewards result))
-           [:show-rewards (:new-rewards result)])]}))
-
-(rf/reg-fx
- :show-rewards
- (fn [rewards]
-   ;; 後でモーダル表示を実装
-   (js/alert (str "新しい報酬を獲得しました！\n"
-                  (clojure.string/join "\n" (map :title rewards))))))
+ (fn [db [_ result]]
+   (rf/dispatch [:load-walks])
+   (rf/dispatch [:load-unlocked-rewards])
+   (when (seq (:new-rewards result))
+     (js/alert (str "新しい報酬を獲得しました！\n"
+                    (clojure.string/join "\n" (map :title (:new-rewards result))))))
+   (-> db
+       (assoc :current-walk nil :loading? false)
+       (update :stats merge (:stats result)))))
