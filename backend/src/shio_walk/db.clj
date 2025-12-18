@@ -51,13 +51,18 @@
 
 ;; ===== ウォーク操作 =====
 
-(defn start-walk! [user-id]
+(defn get-active-walk [user-id]
   (execute-one!
-   ["INSERT INTO walks (user_id, start_time, status) 
-     VALUES (?::uuid, CURRENT_TIMESTAMP, 'in_progress') 
-     RETURNING id, user_id, start_time, status, steps, distance_meters"
-    user-id]
-   {:return-keys true}))
+   ["SELECT * FROM walks WHERE user_id = ?::uuid AND status = 'in_progress'" user-id]))
+
+(defn start-walk! [user-id]
+  (or (get-active-walk user-id)
+      (execute-one!
+       ["INSERT INTO walks (user_id, start_time, status, steps, distance_meters)
+         VALUES (?::uuid, CURRENT_TIMESTAMP, 'in_progress', 0, 0)
+         RETURNING id, user_id, start_time, status, steps, distance_meters"
+        user-id]
+       {:return-keys true})))
 
 (defn get-walk [walk-id]
   (execute-one!
