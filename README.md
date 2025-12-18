@@ -1,5 +1,193 @@
 # shio-walk
 
+ウォーキング距離管理アプリ（バックエンド + フロントエンド）
+歩数・距離を記録し、到達条件を満たすと報酬（画像・音声）を解放する仕組みを提供します。
+
+<img alt="LogInImage" src="images/Screenshot-2025-12-07-10.17.43.png" width="300">
+<img alt="AppImage000" src="images/screenshot-2025-12-15-093709.png" width="300">
+
+---
+
+## 概要
+
+**shio-walk** はスマートフォン向けウォーキングアプリを想定したフルスタックプロジェクトです。
+
+* ウォークの開始・更新・完了を管理
+* 歩数・距離の累計統計を自動更新
+* 条件達成時に報酬をアンロック
+* JWT 認証によるユーザー管理
+
+現在は **バックエンド API およびフロントエンド（ClojureScript + Re-frame）の基本実装が完了** しており、
+ログイン → ダッシュボード表示 → ウォーキング開始 → 状態反映 までの一連の動作が可能です。
+
+一方で、アクティブウォーク中の歩数・距離入力 UI など、一部機能は改善途中です。
+
+---
+
+## 開発状況
+
+### 実装済み
+
+#### バックエンド
+
+* プロジェクト構造作成
+* PostgreSQL 環境構築（Docker Compose）
+* データベースマイグレーション
+* 認証システム（JWT / Buddy）
+* ユーザー登録・ログイン API
+* ウォーク管理 API（開始・更新・完了）
+* 統計情報の自動集計
+* 報酬アンロックロジック
+* API レスポンス形式の正規化（kebab-case / status 統一）
+
+#### フロントエンド
+
+* ClojureScript + Reagent + Re-frame による SPA 構成
+* ログイン / ログアウト UI
+* ダッシュボード表示
+* ウォーキング開始・状態表示
+* 統計情報・報酬一覧表示
+* re-frame による状態管理（app-db）
+
+### 既知の未対応・改善予定
+
+* アクティブウォーク中の歩数・距離入力 UI の安定化
+* UI/UX 改善
+* スマートフォンセンサー連携
+* E2E テスト追加
+
+---
+
+## 技術スタック
+
+### バックエンド
+
+* **Language**: Clojure 1.11.1
+* **Framework**: Ring + Compojure
+* **Server**: Jetty
+* **Database**: PostgreSQL 15
+* **Auth**: JWT（Buddy）
+
+### フロントエンド
+
+* **Language**: ClojureScript
+* **Framework**: Reagent + Re-frame
+* **Build Tool**: shadow-cljs
+* **State Management**: re-frame
+
+---
+
+## ディレクトリ構成
+
+```text
+shio-walk/
+├─ backend/
+│  ├─ deps.edn
+│  ├─ resources/
+│  │  └─ migrations/
+│  └─ src/shio_walk/
+│     ├─ core.clj        ; サーバー起動
+│     ├─ routes.clj      ; ルーティング定義
+│     ├─ middleware.clj  ; JWT認証など
+│     ├─ config.clj      ; 設定（DB接続等）
+│     ├─ db.clj          ; DB操作
+│     ├─ auth/
+│     ├─ walks/
+│     └─ rewards/
+├─ frontend/
+│  ├─ public/
+│  │  ├─ index.html
+│  │  ├─ css/style.css
+│  │  └─ js/
+│  │     ├─ main.js
+│  │     └─ manifest.edn
+│  └─ src/shio_walk/
+│     ├─ core.cljs      ; エントリーポイント
+│     ├─ db.cljs        ; app-db 定義
+│     ├─ events.cljs   ; re-frame events
+│     ├─ subs.cljs     ; re-frame subscriptions
+│     ├─ api.cljs      ; API 通信層
+│     └─ views/
+│        ├─ main.cljs
+│        ├─ login.cljs
+│        └─ dashboard.cljs
+├─ images/
+└─ README.md
+```
+
+---
+## 開発メモ・引き継ぎ
+
+- [デバッグ引き継ぎ手順書](docs/debugging-handover.json)
+
+---
+
+## フロントエンド設計メモ
+
+* 状態管理は re-frame を使用
+* API は **Single Source of Truth** とする
+* フロントエンド側で API のデータ補正は行わない
+* ユーザー操作に対しては optimistic update を採用
+* 非同期イベントによる state 上書きを防ぐため、イベント責務を明確化
+
+---
+
+## API Specification (v2.0)
+
+この API はフロントエンドにとっての唯一の信頼できる情報源（Single Source of Truth）です。
+API 仕様と実装が乖離した場合、フロントエンドでの吸収は禁止し、API 実装側を修正することを原則とします。
+
+（※ 主要エンドポイント・レスポンス例は後述）
+
+---
+
+## 修正履歴（2025-12-18）
+
+* **不具合**: ウォーキング開始ボタンを押しても UI が更新されない問題
+* **原因**:
+
+  * API レスポンスのキー形式が不統一（snake_case / kebab-case 混在）
+  * `status` 値の不整合
+  * re-frame における非同期イベント競合により state が巻き戻る状態競合問題
+* **対応**:
+
+  * バックエンド API を正規化（kebab-case / status="active" 統一）
+  * `nil` 値を返さない API 契約に変更
+  * フロントエンドの state 更新フローを整理
+* **設計判断**:
+
+  * フロントエンドで API の不整合を吸収せず、契約境界である API 側を修正する方針を採用
+
+- **補足**: 本問題は単なるAPI不整合ではなく、非同期イベントが競合した際に
+  re-frame の state が意図せず上書きされることでUIが巻き戻る「状態競合問題」でもあった。
+
+---
+
+## 既知の問題
+
+* アクティブウォーク中に歩数・距離を直接編集するとエラーが発生する
+
+  * 次ステップで対応予定
+
+---
+
+## 今後の予定
+
+* [ ] アクティブウォーク入力 UI の修正
+* [ ] フロントエンドのテスト整備
+* [ ] スマートフォンセンサー連携設計
+* [ ] デプロイ準備
+
+---
+
+## ライセンス
+
+MIT License
+
+
+
+# shio-walk
+
 ウォーキング距離管理アプリ（バックエンド）
 歩数・距離を記録し、到達条件を満たすと報酬（画像・音声）を解放する仕組みを提供します。
 
