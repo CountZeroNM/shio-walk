@@ -46,7 +46,14 @@
              {:headers (auth-header token)
               :response-format :json
               :keywords? true
-              :handler success-fn
+              ;:handler success-fn
+              :handler (fn [resp]
+                 (js/console.log "API start-walk response (raw):" resp)
+                 (js/console.log "as clj:" (pr-str resp))
+                 (success-fn resp))
+;:handler (fn [resp]
+;                          (js/console.log "API start-walk response:" resp)
+;                          (success-fn resp))
               :error-handler error-fn}))
 
 (defn update-walk [token walk-id data success-fn error-fn]

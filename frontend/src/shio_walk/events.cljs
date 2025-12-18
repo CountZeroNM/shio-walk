@@ -173,9 +173,8 @@
 
 (rf/reg-event-db
  :walk-started
- (fn [db [_ walk]]
-   (rf/dispatch [:load-walks])
-   (assoc db :current-walk walk :loading? false)))
+ (fn [db [_ response]]
+   (assoc db :current-walk (:walk response) :loading? false)))
 
 (rf/reg-event-db
  :update-walk

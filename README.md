@@ -177,6 +177,150 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 ---
 
+## API Specification (v2.0)
+
+このAPIはフロントエンドのための唯一の信頼できる情報源(Single Source of Truth)です。API仕様と実装が乖離した場合、フロントエンドでの吸収は禁止し、API実装側を修正することを原則とします。
+
+### 1. Data Conventions
+
+#### Key Naming
+すべてのJSONレスポンスのキーは **`kebab-case`** に統一します。
+
+- **OK**: `:total-steps`
+- **NG**: `:total_steps`, `:totalSteps`
+
+#### Primary Keys
+すべてのリソースのプライマリキーは **`:id`** に統一します。
+
+- **OK**: `:id`
+- **NG**: `:walk-id`, `:reward_id`
+
+#### Status Values
+ステータスを表すフィールドは、小文字の文字列で統一します。
+
+- **Walks**: `"active"`, `"completed"`
+
+#### Timestamps
+タイムスタンプはすべて **ISO-8601** 形式のUTC文字列で表現します。
+
+- **Example**: `"2025-12-18T12:30:00Z"`
+
+### 2. Authentication
+保護されたエンドポイントには、HTTPヘッダーにJWTを含める必要があります。
+
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+### 3. Endpoint Examples
+
+#### `POST /api/walks/start`
+新しいウォーキングセッションを開始します。
+
+- **Response (200 OK)**
+  ```json
+  {
+    "walk": {
+      "id": "1e9d1b0a-0b9a-4c1c-9d1b-0a0b9a4c1c9d",
+      "user-id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
+      "start-time": "2025-12-18T10:00:00Z",
+      "status": "active",
+      "steps": 0,
+      "distance-meters": 0
+    }
+  }
+  ```
+
+#### `GET /api/walks`
+ユーザーの過去のウォーク履歴を取得します。
+
+- **Response (200 OK)**
+  ```json
+  {
+    "walks": [
+      {
+        "id": "1e9d1b0a-0b9a-4c1c-9d1b-0a0b9a4c1c9d",
+        "user-id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
+        "start-time": "2025-12-18T10:00:00Z",
+        "end-time": "2025-12-18T10:45:00Z",
+        "status": "completed",
+        "steps": 5231,
+        "distance-meters": 3800
+      }
+    ]
+  }
+  ```
+
+#### `GET /api/rewards`
+すべての報酬マスタリストを取得します。
+
+- **Response (200 OK)**
+  ```json
+  {
+    "rewards": [
+      {
+        "id": "f4c2e1d1-c2b3-4a5e-b6c7-d8e9f0a1b2c3",
+        "title": "最初の一歩",
+        "description": "初めてのウォーキングを記録する",
+        "threshold-type": "walks",
+        "threshold-value": 1,
+        "image-url": null,
+        "audio-url": null
+      },
+      {
+        "id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
+        "title": "1000歩達成",
+        "description": "1回のウォークで1000歩を達成する",
+        "threshold-type": "steps",
+        "threshold-value": 1000,
+        "image-url": null,
+        "audio-url": null
+      }
+    ]
+  }
+  ```
+
+#### `GET /api/rewards/unlocked`
+ユーザーが獲得した報酬のリストを取得します。
+
+- **Response (200 OK)**
+  ```json
+  {
+    "rewards": [
+      {
+        "id": "f4c2e1d1-c2b3-4a5e-b6c7-d8e9f0a1b2c3",
+        "title": "最初の一歩",
+        "description": "初めてのウォーキングを記録する",
+        "threshold-type": "walks",
+        "threshold-value": 1,
+        "image-url": null,
+        "audio-url": null,
+        "unlocked-at": "2025-12-18T10:45:00Z"
+      }
+    ]
+  }
+  ```
+
+---
+
+## 修正履歴（2025-12-18）
+
+- **不具合**: ウォーキング開始ボタンを押してもUIが更新されない問題、およびリスト表示で`:key`警告が多発する問題。
+- **原因**: バックエンドAPIが返すJSONのデータ形式が不統一だったため。
+  - `start-walk` APIが `status: "in_progress"` を返していた。
+  - レスポンスのキーが `snake_case` と `kebab-case` が混在していた。
+  - 一部のデータで `:id` が `nil` になっていた。
+  - これらのデータの不整合が原因で、フロントエンドのre-frameが状態を正しく認識・更新できず、UIの再描画が失敗していた。
+- **対応**: APIを「唯一の信頼できる情報源」と位置づけ、バックエンドのレスポンスを正規化。
+  - すべてのAPIレスポンスのキーを `kebab-case` に統一。
+  - `start-walk` APIは必ず `status: "active"` を返すように修正。
+  - `id` が `nil` のデータはAPIレスポンスから除外。
+  - `distance-meters` などの数値が `nil` にならないようデフォルト値 `0` を設定。
+  - 上記の前提に基づき、フロントエンドのデータ吸収ロジックを削除・単純化。
+- **設計判断**: 将来の保守コストを最小化するため、フロントエンド側でAPIの不整合を吸収するのではなく、契約境界であるバックエンドAPI側を修正するアプローチを選択。これにより、フロントエンドは受け取ったデータをそのまま信頼して使用できるようになった。
+
+---
+
 ## 既知の問題と対応履歴
 
 * **DB認証失敗**: HikariCP が `:user` を認識しない

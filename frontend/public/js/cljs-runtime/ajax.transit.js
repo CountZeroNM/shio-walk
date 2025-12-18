@@ -1,8 +1,8 @@
 goog.provide('ajax.transit');
-ajax.transit.transit_type = (function ajax$transit$transit_type(p__23417){
-var map__23418 = p__23417;
-var map__23418__$1 = cljs.core.__destructure_map(map__23418);
-var type = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__23418__$1,new cljs.core.Keyword(null,"type","type",1174270348));
+ajax.transit.transit_type = (function ajax$transit$transit_type(p__23394){
+var map__23398 = p__23394;
+var map__23398__$1 = cljs.core.__destructure_map(map__23398);
+var type = cljs.core.get.cljs$core$IFn$_invoke$arity$2(map__23398__$1,new cljs.core.Keyword(null,"type","type",1174270348));
 var or__5002__auto__ = type;
 if(cljs.core.truth_(or__5002__auto__)){
 return or__5002__auto__;
@@ -32,8 +32,8 @@ return cognitect.transit.write(writer,params);
  * :handlers Custom Transit handlers (refer to Transit documentation)
  */
 ajax.transit.transit_request_format = (function ajax$transit$transit_request_format(var_args){
-var G__23423 = arguments.length;
-switch (G__23423) {
+var G__23426 = arguments.length;
+switch (G__23426) {
 case 0:
 return ajax.transit.transit_request_format.cljs$core$IFn$_invoke$arity$0();
 
@@ -80,8 +80,8 @@ return cognitect.transit.read(reader,ajax.protocols._body(response));
  * :handlers Custom Transit handlers (refer to Transit documentation)
  */
 ajax.transit.transit_response_format = (function ajax$transit$transit_response_format(var_args){
-var G__23430 = arguments.length;
-switch (G__23430) {
+var G__23439 = arguments.length;
+switch (G__23439) {
 case 0:
 return ajax.transit.transit_response_format.cljs$core$IFn$_invoke$arity$0();
 
