@@ -7,6 +7,11 @@
 <img alt="AppImage000" src="images/screenshot-2025-12-15-093709.png" width="300">
 
 ---
+> ⚠️ IMPORTANT
+> 本プロジェクトでは、バックエンドAPIを Single Source of Truth とします。
+> フロントエンドでのデータ補正・吸収は禁止し、
+> データ不整合は必ず API 実装側で修正する方針を採用しています。
+---
 
 ## 概要
 
@@ -118,8 +123,13 @@ shio-walk/
 ---
 ## 開発メモ・引き継ぎ
 
-- [デバッグ引き継ぎ手順書](docs/debugging-handover.json)
 
+- [開発メモ MD](docs/debug-notes.md)
+- [デバッグ引き継ぎ手順書 JSON](docs/debugging-handover.json)
+- [作業手順書 JSON](docs/playbook.json)
+- [開発Step&Plan JSON](docs/step-handover.json)
+- [LLM-HandOver JSON](docs/next-llm-handover.json)
+- [LLM-cli-worked-report JSON](docs/cli-workedreport.json)
 ---
 
 ## フロントエンド設計メモ
@@ -184,6 +194,100 @@ API 仕様と実装が乖離した場合、フロントエンドでの吸収は�
 
 MIT License
 
+## 2. 設計とデバッグにおける基本方針（引き継ぎ用・超重要）
+
+### このプロジェクトで最も重要な設計原則
+
+本プロジェクトでは、以下の考え方を最優先とする。
+
+#### 1. APIは Single Source of Truth である
+
+フロントエンドは、バックエンドAPIが返すデータを「加工して辻辻を合わせる」ことをしない。
+データ形式や値の不整合が発生した場合、原則として **API実装側を修正する**。
+
+#### 2. UI状態は「再計算可能な最小単位」で保持する
+
+re-frame の app-db には、以下を直接保持しない方針を採る。
+
+* APIレスポンスをそのまま複製した状態
+* 将来 load API によって上書きされる一時的状態
+
+代わりに：
+
+* 正規化されたリスト（例: `:walks`）
+* そこから導出可能な状態（例: `current-walk` は subs で算出）
+
+を基本構造とする。
+
+#### 3. 「一瞬表示されて戻る」UIは、状態競合のサイン
+
+非同期API呼び出し後に UI が一瞬切り替わり、すぐ元に戻る場合、以下の可能性を最優先で疑う。
+
+* optimistic update と load API の競合
+* 同一イベント名の二重登録
+* derived state と stored state の二重管理
+
+この症状は UI の問題ではなく、**イベント順序・状態設計の問題**であることがほとんどである。
+
+---
+
+## 3. 今回のデバッグから得られた重要な学び（核心）
+
+### 1. optimistic update は「部分的」に使う
+
+今回、`:start-walk` 後に UI が戻る問題の原因は以下だった。
+
+* start-walk で一時的に状態を更新
+* 直後に load-walks が古い一覧で上書き
+
+対応として：
+
+* optimistic update は「UI反応を早くするための最小限」に留める
+* 最終状態は必ず load API の結果で確定させる
+
+### 2. re-frame で同じ event-id を二重定義すると破滅する
+
+以下の警告は極めて危険なサインである。
+
+```
+re-frame: overwriting :event handler for: walks-loaded
+```
+
+これは：
+
+* ファイル分割やコピペで同名イベントを複数定義している
+* ロード順によって挙動が変わる
+
+という **再現性の低いバグの温床**になる。
+
+→ event-id は「グローバル一意」と認識する。
+
+### 3. 状態を「持つ」か「導出する」かを必ず選ぶ
+
+* ❌ `:current-walk` を db に直接保持
+* ⭕ `:walks` から subs で `current-walk` を導出
+
+この切り替えにより：
+
+* API再取得
+* 画面リロード
+* 非同期競合
+
+すべてに耐える構造になった。
+
+### 4. UIバグの8割は「状態設計」
+
+ボタンが反応しない、表示が戻る、値が消える等の問題は、DOMやCSSではなく **状態の流れ**が原因であることがほとんど。
+
+---
+
+## 補足：API命名規則とフロントエンドでの扱い
+
+> NOTE:
+> フロントエンドでは API のレスポンスを直接状態として保持せず、
+> 正規化されたコレクション（例: `walks`）から subs により状態を導出する。
+> そのため API の命名規則違反や値の不整合は、
+> UI 側ではなく API 側で修正することを原則とする。
 
 
 # shio-walk

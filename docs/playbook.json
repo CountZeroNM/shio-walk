@@ -1,0 +1,21 @@
+{
+  "issue": "start-walk UI does not persist",
+  "symptoms": [
+    "UI switches briefly then reverts",
+    "API returns active walk but UI not updated"
+  ],
+  "root_causes": [
+    "duplicate event handlers",
+    "async load overwriting optimistic state"
+  ],
+  "fix_steps": [
+    "ensure single reg-event for :walks-loaded",
+    "introduce :walk-started optimistic update",
+    "verify subs derive from app-db consistently"
+  ],
+  "checks": [
+    "UI stays in walking state after click",
+    "no re-frame overwrite warnings in console"
+  ]
+}
+
