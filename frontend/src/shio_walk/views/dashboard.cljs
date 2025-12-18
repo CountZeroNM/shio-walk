@@ -34,46 +34,57 @@
 
 (defn walk-control []
   (let [current-walk @(rf/subscribe [:current-walk])
-        loading? @(rf/subscribe [:loading?])
-        steps (r/atom (str (or (:steps current-walk) 0)))
-        distance (r/atom (str (.toFixed (/ (or (:distance-meters current-walk) 0) 1000) 2)))]
-    (fn []
-      [:div.container
-       [:h2 "ウォーキング"]
-       (if current-walk
-         [:div
-          [:p {:style {:color "#667eea" :font-weight "bold"}}
-           "ウォーキング中..."]
-          [:div {:style {:margin "20px 0"}}
-           [:label {:style {:display "block" :margin-bottom "5px"}}
-            "歩数:"]
-           [:input {:type "number"
-                    :value @steps
-                    :on-change #(reset! steps (-> % .-target .-value))
-                    :disabled loading?}]
-           [:label {:style {:display "block" :margin-bottom "5px" :margin-top "15px"}}
-            "距離 (km):"]
-           [:input {:type "number"
-                    :step "0.01"
-                    :value @distance
-                    :on-change #(reset! distance (-> % .-target .-value))
-                    :disabled loading?}]]
-          [:div {:style {:display "flex" :gap "10px"}}
-           [:button {:on-click #(rf/dispatch [:update-walk
-                                              (:id current-walk)
-                                              {:steps (js/parseInt @steps)
-                                               :distance (js/parseFloat @distance)}])
-                     :disabled loading?}
-            "更新"]
-           [:button {:on-click #(rf/dispatch [:complete-walk (:id current-walk)])
-                     :disabled loading?
-                     :style {:background "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"}}
-            "完了"]]]
-         [:div
-          [:p "ウォーキングを開始しましょう！"]
-          [:button {:on-click #(rf/dispatch [:start-walk])
-                    :disabled loading?}
-           "ウォーキング開始"]])])))
+        loading? @(rf/subscribe [:loading?])]
+    [:div.container
+     [:h2 "ウォーキング"]
+     (if current-walk
+       [:div
+        [:p {:style {:color "#667eea" :font-weight "bold"}}
+         "ウォーキング中..."]
+
+        [:div {:style {:margin "20px 0"}}
+         [:label {:style {:display "block" :margin-bottom "5px"}}
+          "歩数:"]
+         [:input {:type "number"
+                  :value (:steps current-walk)
+                  :on-change #(rf/dispatch
+                               [:update-walk
+                                (:id current-walk)
+                                {:steps (js/parseInt (-> % .-target .-value))}])
+                  :disabled loading?}]
+
+         [:label {:style {:display "block"
+                          :margin-bottom "5px"
+                          :margin-top "15px"}}
+          "距離 (km):"]
+         [:input {:type "number"
+                  :step "0.01"
+                  :value (.toFixed (/ (:distance-meters current-walk) 1000) 2)
+                  :on-change #(rf/dispatch
+                               [:update-walk
+                                (:id current-walk)
+                                {:distance (js/parseFloat (-> % .-target .-value))}])
+                  :disabled loading?}]]
+
+        [:div {:style {:display "flex" :gap "10px"}}
+         [:button {:on-click #(rf/dispatch
+                               [:update-walk
+                                (:id current-walk)
+                                {:steps (:steps current-walk)
+                                 :distance (/ (:distance-meters current-walk) 1000)}])
+                   :disabled loading?}
+          "更新"]
+         [:button {:on-click #(rf/dispatch
+                               [:complete-walk (:id current-walk)])
+                   :disabled loading?
+                   :style {:background
+                           "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"}}
+          "完了"]]]
+       [:div
+        [:p "ウォーキングを開始しましょう！"]
+        [:button {:on-click #(rf/dispatch [:start-walk])
+                  :disabled loading?}
+         "ウォーキング開始"]])]))
 
 (defn walks-history []
   (let [walks @(rf/subscribe [:walks])]
