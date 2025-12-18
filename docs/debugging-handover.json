@@ -1,0 +1,54 @@
+{
+  "document_type": "debugging_handover_guide",
+  "project": "shio-walk",
+  "context": {
+    "problem_domain": "re-frame frontend + REST backend",
+    "symptom": "UI briefly updates then reverts after start-walk",
+    "severity": "High (core UX broken)"
+  },
+  "root_cause": {
+    "category": "State race condition",
+    "details": [
+      "Optimistic update applied via :walk-started",
+      ":walks-loaded event overwrote :current-walk with nil",
+      "re-frame last-event-wins behavior"
+    ]
+  },
+  "final_solution": {
+    "principles": [
+      "Do not overwrite valid state with nil",
+      "Backend is source of truth, but frontend must guard state transitions",
+      "Use optimistic updates for user-triggered actions"
+    ],
+    "key_fixes": [
+      "Conditional update in :walks-loaded",
+      "Optimistic dispatch on :start-walk"
+    ]
+  },
+  "lessons_learned": [
+    "If UI flickers then reverts, suspect async event collision",
+    "Logging API response is not sufficient; log state transitions",
+    "re-frame requires explicit state ownership"
+  ],
+  "known_remaining_issues": [
+    "Editing steps/distance in active walk causes error"
+  ],
+  "next_steps": [
+    {
+      "step": 1,
+      "task": "Fix walk-control input handling",
+      "hint": "Local reagent atom vs app-db sync"
+    },
+    {
+      "step": 2,
+      "task": "Derive stats from backend response only",
+      "hint": "Avoid client-side recomputation"
+    },
+    {
+      "step": 3,
+      "task": "Add regression checklist for re-frame events",
+      "hint": "Ensure no event overwrites another's state"
+    }
+  ]
+}
+
