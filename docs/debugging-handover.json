@@ -1,54 +1,152 @@
 {
-  "document_type": "debugging_handover_guide",
-  "project": "shio-walk",
-  "context": {
-    "problem_domain": "re-frame frontend + REST backend",
-    "symptom": "UI briefly updates then reverts after start-walk",
-    "severity": "High (core UX broken)"
+  "meta": {
+    "project": "shio-walk",
+    "document": "debugging-handover",
+    "version": "1.0.0",
+    "last_updated": "2025-12-18",
+    "purpose": "Long-term debugging handover and recurrence prevention"
   },
-  "root_cause": {
-    "category": "State race condition",
-    "details": [
-      "Optimistic update applied via :walk-started",
-      ":walks-loaded event overwrote :current-walk with nil",
-      "re-frame last-event-wins behavior"
-    ]
+
+  "core_principles": {
+    "single_source_of_truth": {
+      "description": "Backend API is the only trusted source of data.",
+      "frontend_policy": [
+        "Frontend must not normalize or absorb API inconsistencies",
+        "All contract violations must be fixed at the API level",
+        "Frontend assumes received data is correct and complete"
+      ],
+      "anti_patterns": [
+        "Frontend-side defaulting for broken API values",
+        "Conditional fixes based on API response shape",
+        "Silent fallback logic hiding backend bugs"
+      ]
+    }
   },
-  "final_solution": {
-    "principles": [
-      "Do not overwrite valid state with nil",
-      "Backend is source of truth, but frontend must guard state transitions",
-      "Use optimistic updates for user-triggered actions"
+
+  "incident_summary": {
+    "symptoms": [
+      "UI switches momentarily after button click",
+      "UI immediately reverts to previous state",
+      "API returns success response",
+      "No fatal errors, only warnings or none"
     ],
-    "key_fixes": [
-      "Conditional update in :walks-loaded",
-      "Optimistic dispatch on :start-walk"
+    "root_cause": "State inconsistency caused by unstable API contract combined with optimistic UI updates",
+    "classification": [
+      "Race condition",
+      "State overwrite",
+      "Contract violation"
     ]
   },
-  "lessons_learned": [
-    "If UI flickers then reverts, suspect async event collision",
-    "Logging API response is not sufficient; log state transitions",
-    "re-frame requires explicit state ownership"
-  ],
-  "known_remaining_issues": [
-    "Editing steps/distance in active walk causes error"
-  ],
-  "next_steps": [
+
+  "root_causes": {
+    "api_contract_issues": [
+      {
+        "issue": "status value inconsistency",
+        "details": ["active", "in_progress"],
+        "impact": "re-frame subscriptions fail to detect active walk"
+      },
+      {
+        "issue": "mixed key naming conventions",
+        "details": ["snake_case", "kebab-case"],
+        "impact": "state shape mismatch"
+      },
+      {
+        "issue": "nil numeric values",
+        "details": ["steps", "distance-meters"],
+        "impact": "UI rendering errors and state invalidation"
+      },
+      {
+        "issue": "nil primary keys",
+        "details": ["id"],
+        "impact": "list rendering and diffing failures"
+      }
+    ],
+    "frontend_state_issues": [
+      "Optimistic update applied before API contract stabilized",
+      "load-walks event overwrote optimistic state",
+      "Multiple events writing to the same state keys"
+    ]
+  },
+
+  "design_decisions": {
+    "chosen_approach": "Fix API contract instead of frontend absorption",
+    "rejected_alternatives": [
+      "Frontend-side normalization",
+      "Conditional rendering based on partial data",
+      "Suppressing warnings"
+    ],
+    "justification": [
+      "Reduces long-term maintenance cost",
+      "Prevents hidden bugs",
+      "Simplifies re-frame state logic",
+      "Improves debuggability and onboarding"
+    ]
+  },
+
+  "key_learnings": {
+    "re_frame_insight": "UI flicker or rollback almost always indicates state being overwritten by a later event",
+    "optimistic_update_warning": "Optimistic UI updates are unsafe unless API responses are fully stable and deterministic",
+    "anti_absorption_rule": "Frontend absorption of API bugs creates future failures and should be avoided"
+  },
+
+  "debugging_checklists": {
+    "api_checklist": [
+      "All response keys are kebab-case",
+      "Primary key :id is always present",
+      "Numeric fields never return null",
+      "Status values are fixed and documented",
+      "All related endpoints return consistent structures"
+    ],
+    "frontend_checklist": [
+      "No duplicate reg-event registrations",
+      "No conflicting state writes across events",
+      "Optimistic updates do not race with API reloads",
+      "Derived state (current-*) matches API data"
+    ]
+  },
+
+  "recommended_debug_flow": [
     {
       "step": 1,
-      "task": "Fix walk-control input handling",
-      "hint": "Local reagent atom vs app-db sync"
+      "action": "Log raw API response to console",
+      "goal": "Verify contract integrity"
     },
     {
       "step": 2,
-      "task": "Derive stats from backend response only",
-      "hint": "Avoid client-side recomputation"
+      "action": "Validate key naming, status values, and nulls",
+      "goal": "Detect contract violations early"
     },
     {
       "step": 3,
-      "task": "Add regression checklist for re-frame events",
-      "hint": "Ensure no event overwrites another's state"
+      "action": "Trace re-frame event dispatch order",
+      "goal": "Identify last state writer"
+    },
+    {
+      "step": 4,
+      "action": "Confirm which event overwrites expected state",
+      "goal": "Locate rollback source"
+    },
+    {
+      "step": 5,
+      "action": "Fix API contract before touching frontend",
+      "goal": "Prevent recurrence"
     }
-  ]
+  ],
+
+  "documentation_relationships": {
+    "README": "Official project overview and specifications",
+    "debug_notes_md": "Design reasoning, failures, and lessons learned",
+    "debugging_handover_json": "Operational checklist and step-by-step debugging guide"
+  },
+
+  "future_guidelines": {
+    "when_new_bug_occurs": [
+      "Do not immediately patch frontend",
+      "Validate API response against contract",
+      "Use checklist-driven debugging",
+      "Document decision and outcome"
+    ],
+    "goal": "Ensure knowledge continuity and prevent repeated failure patterns"
+  }
 }
 
