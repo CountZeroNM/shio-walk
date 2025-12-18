@@ -59,7 +59,7 @@
                     :on-change #(reset! distance (-> % .-target .-value))
                     :disabled loading?}]]
           [:div {:style {:display "flex" :gap "10px"}}
-           [:button {:on-click #(rf/dispatch [:update-walk 
+           [:button {:on-click #(rf/dispatch [:update-walk
                                               (:id current-walk)
                                               {:steps (js/parseInt @steps)
                                                :distance (js/parseFloat @distance)}])
@@ -81,69 +81,81 @@
      [:h2 "ウォーク履歴"]
      (if (empty? walks)
        [:p "まだウォーク記録がありません"]
-       [:div
+       (into
+        [:div]
         (for [walk (take 10 walks)]
-          ^{:key (:id walk)}
-          [:div {:style {:background "#f5f5f5"
-                        :padding "15px"
-                        :margin "10px 0"
-                        :border-radius "8px"
-                        :border-left (str "4px solid " 
-                                         (if (= (:status walk) "completed")
-                                           "#38ef7d"
-                                           "#667eea"))}}
+          [:div
+           {:key (:id walk)
+            :style {:background "#f5f5f5"
+                    :padding "15px"
+                    :margin "10px 0"
+                    :border-radius "8px"
+                    :border-left (str "4px solid "
+                                      (if (= (:status walk) "completed")
+                                        "#38ef7d"
+                                        "#667eea"))}}
            [:div {:style {:display "flex"
-                         :justify-content "space-between"
-                         :align-items "center"}}
+                          :justify-content "space-between"
+                          :align-items "center"}}
             [:div
-             [:strong (if (= (:status walk) "completed") "✓ 完了" "進行中")]
-             [:p {:style {:margin "5px 0" :color "#666"}}
+             [:strong (if (= (:status walk) "completed")
+                        "✓ 完了"
+                        "進行中")]
+             [:p {:style {:margin "5px 0"
+                          :color "#666"}}
               (str (:steps walk) "歩 / "
-                   (.toFixed (/ (:distance-meters walk) 1000) 2) "km")]
-             [:p {:style {:margin "0" :font-size "0.9em" :color "#999"}}
+                   (.toFixed (/ (:distance-meters walk) 1000) 2)
+                   "km")]
+             [:p {:style {:margin "0"
+                          :font-size "0.9em"
+                          :color "#999"}}
               (:start-time walk)]]
-            (when (= (:status walk) "completed")
-              [:div {:style {:color "#38ef7d" :font-size "2em"}}
-               "🏆"])]])])]))
+            (if (= (:status walk) "completed")
+              [:div {:style {:color "#38ef7d"
+                             :font-size "2em"}}
+               "🏆"]
+              [:<>])]])))]))
 
 (defn rewards-panel []
   (let [rewards @(rf/subscribe [:rewards])
         unlocked-rewards @(rf/subscribe [:unlocked-rewards])
-        unlocked-ids (set (map :reward-id unlocked-rewards))]
+        unlocked-ids (set (map :id unlocked-rewards))]
     [:div.container
      [:h2 "報酬"]
      (if (empty? rewards)
        [:p "報酬データを読み込み中..."]
-       [:div {:style {:display "grid"
-                     :grid-template-columns "repeat(auto-fill, minmax(250px, 1fr))"
-                     :gap "20px"}}
+       (into
+        [:div {:style {:display "grid"
+                       :grid-template-columns "repeat(auto-fill, minmax(250px, 1fr))"
+                       :gap "20px"}}]
         (for [reward rewards]
           (let [unlocked? (contains? unlocked-ids (:id reward))]
-            ^{:key (:id reward)}
-            [:div {:style {:background (if unlocked? "#f0f9ff" "#f5f5f5")
-                          :padding "20px"
-                          :border-radius "8px"
-                          :border (str "2px solid " (if unlocked? "#667eea" "#e0e0e0"))
-                          :opacity (if unlocked? 1 0.6)}}
+            [:div {:key (:id reward)
+                   :style {:background (if unlocked? "#f0f9ff" "#f5f5f5")
+                           :padding "20px"
+                           :border-radius "8px"
+                           :border (str "2px solid "
+                                        (if unlocked? "#667eea" "#e0e0e0"))
+                           :opacity (if unlocked? 1 0.6)}}
              [:div {:style {:display "flex"
-                           :justify-content "space-between"
-                           :align-items "flex-start"}}
+                            :justify-content "space-between"
+                            :align-items "flex-start"}}
               [:div
                [:h3 {:style {:margin "0 0 10px 0"
-                            :color (if unlocked? "#667eea" "#666")}}
+                             :color (if unlocked? "#667eea" "#666")}}
                 (:title reward)]
                [:p {:style {:margin "5px 0"
-                           :color "#666"
-                           :font-size "0.9em"}}
+                            :color "#666"
+                            :font-size "0.9em"}}
                 (if (= (:threshold-type reward) "steps")
                   (str (:threshold-value reward) "歩")
                   (str (/ (:threshold-value reward) 1000) "km"))]
                [:p {:style {:margin "5px 0"
-                           :font-size "0.9em"}}
+                            :font-size "0.9em"}}
                 (:description reward)]]
               (when unlocked?
                 [:div {:style {:color "#667eea" :font-size "2em"}}
-                 "🎉"])]]))])]))
+                 "🎉"])]]))))]))
 
 
 (defn dashboard-page []
