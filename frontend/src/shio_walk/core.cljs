@@ -1,16 +1,24 @@
 (ns shio-walk.core
-  (:require [reagent.dom :as rdom]
-            [re-frame.core :as rf]
-            [shio-walk.events]
-            [shio-walk.subs]
-            [shio-walk.views.main :as views]))
+  (:require
+   [reagent.dom.client :as rdom]
+   [re-frame.core :as rf]
+   [shio-walk.events]
+   [shio-walk.subs]
+   [shio-walk.views.main :as views]))
 
-(defn ^:dev/after-load mount-root []
+;; React 18 root は一度だけ生成する
+(defonce root
+  (rdom/create-root
+    (.getElementById js/document "app")))
+
+(defn mount-root []
   (rf/clear-subscription-cache!)
-  (let [root-el (.getElementById js/document "app")]
-    (rdom/unmount-component-at-node root-el)
-    (rdom/render [views/main-panel] root-el)))
+  (rdom/render root [views/main-panel]))
 
 (defn init []
   (rf/dispatch-sync [:initialize-db])
+  (mount-root))
+
+;; Hot Reload 用
+(defn ^:dev/after-load reload []
   (mount-root))
