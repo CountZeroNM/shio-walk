@@ -6,8 +6,8 @@ goog.scope(function(){
  * simplified js->clj for JSON data, :key-fn default to keyword
  */
 shadow.json.to_clj = (function shadow$json$to_clj(var_args){
-var G__11606 = arguments.length;
-switch (G__11606) {
+var G__11607 = arguments.length;
+switch (G__11607) {
 case 1:
 return shadow.json.to_clj.cljs$core$IFn$_invoke$arity$1((arguments[(0)]));
 
