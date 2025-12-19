@@ -2,6 +2,16 @@
   (:require [re-frame.core :as rf]
             [reagent.core :as r]))
 
+;; ユーティリティ関数
+(defn format-distance [meters]
+  (.toFixed (/ (or meters 0) 1000) 2))
+
+(defn safe-parse-int [s]
+  (or (js/parseInt s) 0))
+
+(defn safe-parse-float [s]
+  (or (js/parseFloat s) 0))
+
 (defn header []
   (let [user @(rf/subscribe [:user])]
     [:div.container
@@ -34,10 +44,14 @@
 
 (defn walk-control []
   (let [current-walk @(rf/subscribe [:current-walk])
-        loading? @(rf/subscribe [:loading?])
-        steps (r/atom (str (or (:steps current-walk) 0)))
-        distance (r/atom (str (.toFixed (/ (or (:distance-meters current-walk) 0) 1000) 2)))]
-    (fn []
+        loading? @(rf/subscribe [:loading?])]
+    (r/with-let [steps (r/atom "0")
+                 distance (r/atom "0.00")]
+      ;; current-walkが変わったらatomを更新
+      (when current-walk
+        (reset! steps (str (or (:steps current-walk) 0)))
+        (reset! distance (format-distance (:distance-meters current-walk))))
+      
       [:div.container
        [:h2 "ウォーキング"]
        (if current-walk
@@ -61,8 +75,8 @@
           [:div {:style {:display "flex" :gap "10px"}}
            [:button {:on-click #(rf/dispatch [:update-walk 
                                               (:id current-walk)
-                                              {:steps (js/parseInt @steps)
-                                               :distance (js/parseFloat @distance)}])
+                                              {:steps (safe-parse-int @steps)
+                                               :distance (safe-parse-float @distance)}])
                      :disabled loading?}
             "更新"]
            [:button {:on-click #(rf/dispatch [:complete-walk (:id current-walk)])
@@ -71,45 +85,73 @@
             "完了"]]]
          [:div
           [:p "ウォーキングを開始しましょう！"]
-          [:button {:on-click #(rf/dispatch [:start-walk])
+          [:button {:on-click #(do
+                                 (js/console.log "ボタンがクリックされました")
+                                 (rf/dispatch [:start-walk]))
                     :disabled loading?}
            "ウォーキング開始"]])])))
 
 (defn walks-history []
-  (let [walks @(rf/subscribe [:walks])]
+  (let [walks @(rf/subscribe [:walks])
+        walk-items (for [walk (take 10 walks)]
+                     ^{:key (:id walk)}
+                     [:div {:style {:background "#f5f5f5"
+                                   :padding "15px"
+                                   :margin "10px 0"
+                                   :border-radius "8px"
+                                   :border-left (str "4px solid " 
+                                                    (if (= (:status walk) "completed")
+                                                      "#38ef7d"
+                                                      "#667eea"))}}
+                      [:div {:style {:display "flex"
+                                    :justify-content "space-between"
+                                    :align-items "center"}}
+                       [:div
+                        [:strong (if (= (:status walk) "completed") "✓ 完了" "進行中")]
+                        [:p {:style {:margin "5px 0" :color "#666"}}
+                         (str (:steps walk) "歩 / " (format-distance (:distance-meters walk)) "km")]
+                        [:p {:style {:margin "0" :font-size "0.9em" :color "#999"}}
+                         (:start-time walk)]]
+                       (when (= (:status walk) "completed")
+                         [:div {:style {:color "#38ef7d" :font-size "2em"}}
+                          "🏆"])]])]
     [:div.container
      [:h2 "ウォーク履歴"]
      (if (empty? walks)
        [:p "まだウォーク記録がありません"]
-       [:div
-        (for [walk (take 10 walks)]
-          ^{:key (:id walk)}
-          [:div {:style {:background "#f5f5f5"
-                        :padding "15px"
-                        :margin "10px 0"
-                        :border-radius "8px"
-                        :border-left (str "4px solid " 
-                                         (if (= (:status walk) "completed")
-                                           "#38ef7d"
-                                           "#667eea"))}}
-           [:div {:style {:display "flex"
-                         :justify-content "space-between"
-                         :align-items "center"}}
-            [:div
-             [:strong (if (= (:status walk) "completed") "✓ 完了" "進行中")]
-             [:p {:style {:margin "5px 0" :color "#666"}}
-              (str (:steps walk) "歩 / "
-                   (.toFixed (/ (:distance-meters walk) 1000) 2) "km")]
-             [:p {:style {:margin "0" :font-size "0.9em" :color "#999"}}
-              (:start-time walk)]]
-            (when (= (:status walk) "completed")
-              [:div {:style {:color "#38ef7d" :font-size "2em"}}
-               "🏆"])]])])]))
+       [:div walk-items])]))
 
 (defn rewards-panel []
   (let [rewards @(rf/subscribe [:rewards])
         unlocked-rewards @(rf/subscribe [:unlocked-rewards])
-        unlocked-ids (set (map :reward-id unlocked-rewards))]
+        unlocked-ids (set (map :reward-id unlocked-rewards))
+        reward-cards (for [reward rewards]
+                       (let [unlocked? (contains? unlocked-ids (:id reward))]
+                         ^{:key (:id reward)}
+                         [:div {:style {:background (if unlocked? "#f0f9ff" "#f5f5f5")
+                                       :padding "20px"
+                                       :border-radius "8px"
+                                       :border (str "2px solid " (if unlocked? "#667eea" "#e0e0e0"))
+                                       :opacity (if unlocked? 1 0.6)}}
+                          [:div {:style {:display "flex"
+                                        :justify-content "space-between"
+                                        :align-items "flex-start"}}
+                           [:div
+                            [:h3 {:style {:margin "0 0 10px 0"
+                                         :color (if unlocked? "#667eea" "#666")}}
+                             (:title reward)]
+                            [:p {:style {:margin "5px 0"
+                                        :color "#666"
+                                        :font-size "0.9em"}}
+                             (if (= (:threshold-type reward) "steps")
+                               (str (:threshold-value reward) "歩")
+                               (str (/ (:threshold-value reward) 1000) "km"))]
+                            [:p {:style {:margin "5px 0"
+                                        :font-size "0.9em"}}
+                             (:description reward)]]
+                           (when unlocked?
+                             [:div {:style {:color "#667eea" :font-size "2em"}}
+                              "🎉"])]]))]
     [:div.container
      [:h2 "報酬"]
      (if (empty? rewards)
@@ -117,34 +159,7 @@
        [:div {:style {:display "grid"
                      :grid-template-columns "repeat(auto-fill, minmax(250px, 1fr))"
                      :gap "20px"}}
-        (for [reward rewards]
-          (let [unlocked? (contains? unlocked-ids (:id reward))]
-            ^{:key (:id reward)}
-            [:div {:style {:background (if unlocked? "#f0f9ff" "#f5f5f5")
-                          :padding "20px"
-                          :border-radius "8px"
-                          :border (str "2px solid " (if unlocked? "#667eea" "#e0e0e0"))
-                          :opacity (if unlocked? 1 0.6)}}
-             [:div {:style {:display "flex"
-                           :justify-content "space-between"
-                           :align-items "flex-start"}}
-              [:div
-               [:h3 {:style {:margin "0 0 10px 0"
-                            :color (if unlocked? "#667eea" "#666")}}
-                (:title reward)]
-               [:p {:style {:margin "5px 0"
-                           :color "#666"
-                           :font-size "0.9em"}}
-                (if (= (:threshold-type reward) "steps")
-                  (str (:threshold-value reward) "歩")
-                  (str (/ (:threshold-value reward) 1000) "km"))]
-               [:p {:style {:margin "5px 0"
-                           :font-size "0.9em"}}
-                (:description reward)]]
-              (when unlocked?
-                [:div {:style {:color "#667eea" :font-size "2em"}}
-                 "🎉"])]]))])]))
-
+        reward-cards])]))
 
 (defn dashboard-page []
   [:div
