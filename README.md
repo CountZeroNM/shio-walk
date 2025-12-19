@@ -6,12 +6,12 @@
 <img alt="LogInImage" src="images/Screenshot-2025-12-07-10.17.43.png" width="300">
 <img alt="AppImage000" src="images/screenshot-2025-12-15-093709.png" width="300">
 
----
-> ⚠️ IMPORTANT
+
+> [!IMPORTANT]
 > 本プロジェクトでは、バックエンドAPIを Single Source of Truth とします。
 > フロントエンドでのデータ補正・吸収は禁止し、
 > データ不整合は必ず API 実装側で修正する方針を採用しています。
----
+
 
 ## 概要
 
@@ -536,7 +536,7 @@ Authorization: Bearer <your-jwt-token>
   * 対応: DB関数をマルチアリティ化
 
 ---
-
+> ⚠️ IMPORTANT
 
 > [!NOTE]
 > ##### 編集メモ
