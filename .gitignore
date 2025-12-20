@@ -44,6 +44,8 @@ Thumbs.db
 /resources/public/js/
 node_modules/
 .shadow-cljs/
+# frontend build artifacts
+/frontend/public/js/
 
 # Temporary files
 /tmp/
