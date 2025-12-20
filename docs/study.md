@@ -80,3 +80,46 @@
   (rdom/render root [views/main-panel]))
 ...
 ```
+
+---
+
+## `frontend/src/shio_walk/views/main.cljs` のコードリーディング
+
+このファイルは、アプリケーションのメインとなるUIコンポーネントを定義しています。`re-frame` というフレームワークを使い、現在の状態に応じて表示するページを切り替える役割を担っています。
+
+### 1. `ns shio-walk.views.main`
+
+*   ClojureScriptのコードがどの「名前空間（namespace）」に属するかを定義しています。JavaのパッケージやJavaScriptのモジュールに似た概念です。
+*   `(:require ...)` の部分で、このファイルが依存する他のライブラリやコンポーネントを読み込んでいます。
+    *   `re-frame.core :as rf`: `re-frame`ライブラリのコア機能を `rf` という別名で使えるようにしています。`re-frame`はClojureScriptのUI構築で人気のあるフレームワークです。
+    *   `shio-walk.views.login :as login`: ログイン画面に関するコンポーネントを `login` という別名で読み込んでいます。
+    *   `shio-walk.views.dashboard :as dashboard`: ダッシュボード画面のコンポーネントを `dashboard` という別名で読み込んでいます。
+
+### 2. `defn main-panel []`
+
+*   `main-panel` という名前のUIコンポーネント（関数）を定義しています。Reagent（`re-frame`が内部で使用）では、UIコンポーネントは多くの場合、単なる関数として定義されます。
+*   この関数は、HTMLの構造を表すデータ（Hiccupと呼ばれるClojureScriptのベクター）を返します。
+
+### 3. `let [...]`
+
+*   `let` は、ローカル変数（束縛）を定義するために使います。
+*   `current-page @(rf/subscribe [:current-page])`: `re-frame`の「サブスクリプション（subscription）」を使っています。
+    *   `rf/subscribe [:current-page]` は、アプリケーションの状態（DB）から `:current-page` という値を取り出す予約をします。
+    *   `@` は `deref` の略で、予約した値が更新されるたびに、その最新の値を取り出します。これにより、`current-page` の値が変わると、このコンポーネントが自動的に再描画されます。
+*   `error @(rf/subscribe [:error])`: 同様に、アプリケーション全体の状態からエラーメッセージを取得しています。
+
+### 4. `[:div ...]`
+
+*   これがHiccup形式のデータです。`[:tag-name.class-name {:attribute "value"} "content"]` のように記述し、HTMLの `<div>` タグを表します。
+*   `(when error ...)`: `error` 変数に値がある（`nil` や `false` でない）場合にのみ、エラーメッセージを表示する `<div>` をレンダリングします。
+    *   `[:button {:on-click #(rf/dispatch [:clear-error])} "閉じる"]`: ボタンがクリックされたときに `re-frame` のイベント `:clear-error` を発行（dispatch）します。これにより、エラー状態をクリアするロジックが呼び出されます。
+*   `(case current-page ...)`: `current-page` の値に応じて、表示するコンポーネントを切り替えています。
+    *   `:login` なら `[login/login-page]` を表示します。
+    *   `:register` なら `[login/register-page]` を表示します。
+    *   `:dashboard` なら `[dashboard/dashboard-page]` を表示します。
+    *   どれにも当てはまらない場合は、デフォルトとして `[login/login-page]` を表示します。
+    *   `[component-name]` という角括弧でコンポーネント関数を囲むことで、ReagentがそれをUIコンポーネントとして解釈し、描画します。
+
+### まとめ
+
+この `main.cljs` は、アプリケーションの「ルーター」のような役割を果たしています。`re-frame` の状態管理とサブスクリプションを利用して、現在のページ状態 (`:current-page`) を監視し、その値に基づいて適切なビュー（ログイン、登録、またはダッシュボード）を描画する、リアクティブなコンポーネントです。
