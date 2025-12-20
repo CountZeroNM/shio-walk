@@ -125,11 +125,13 @@ shio-walk/
 
 
 - [開発メモ MD](docs/debug-notes.md)
+- [API memo MD](docs/api.md)
 - [デバッグ引き継ぎ手順書 JSON](docs/debugging-handover.json)
 - [作業手順書 JSON](docs/playbook.json)
 - [開発Step&Plan JSON](docs/step-handover.json)
 - [LLM-HandOver JSON](docs/next-llm-handover.json)
 - [LLM-cli-worked-report JSON](docs/cli-workedreport.json)
+- [Study this Code](docs/study.md)
 ---
 
 ## フロントエンド設計メモ
