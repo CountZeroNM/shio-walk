@@ -4,7 +4,7 @@
 
 (def migratus-config
   {:store :database
-   :migration-dir "migrations/"
+   :migration-dir "migrations"
    :db (:db config)})
 
 (defn migrate []
