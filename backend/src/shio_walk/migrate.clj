@@ -8,7 +8,7 @@
    :db (:db config)})
 
 (defn migrate []
-  (println "Running migrations...")
+  (println "Running migrations with config:" migratus-config)
   (migratus/migrate migratus-config)
   (println "Migrations completed!"))
 

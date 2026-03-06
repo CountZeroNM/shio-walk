@@ -62,7 +62,7 @@
                  :on-change #(reset! username (-> % .-target .-value))
                  :disabled loading?}]
         [:input {:type "password"
-                 :placeholder "パスワード"
+                 :placeholder "パスワード （８文字以上）"
                  :value @password
                  :on-change #(reset! password (-> % .-target .-value))
                  :disabled loading?}]

@@ -9,11 +9,11 @@
       (let [walk (db/start-walk! user-id)]
         (response/response
          {:walk {:id (str (:walks/id walk))
-                 :user-id (str (or (:walks/user-id walk) user-id))
-                 :start-time (str (:walks/start-time walk))
+                 :user-id (str (or (:walks/user_id walk) user-id))
+                 :start-time (str (:walks/start_time walk))
                  :status "active"
                  :steps (or (:walks/steps walk) 0)
-                 :distance-meters (or (:walks/distance-meters walk) 0)}}))
+                 :distance-meters (or (:walks/distance_meters walk) 0)}}))
       (catch Exception e
         (-> (response/response {:error "Failed to start walk"
                                :details (.getMessage e)})
@@ -51,7 +51,7 @@
           (response/response
            {:walk {:id (str (:walks/id walk))
                    :steps (:walks/steps walk)
-                   :distance-meters (:walks/distance-meters walk)
+                   :distance-meters (:walks/distance_meters walk)
                    :status (:walks/status walk)
                    :updated-at (str (:walks/updated_at walk))}})
           (-> (response/response {:error "Walk not found or already completed"})
@@ -68,14 +68,14 @@
       (if-let [walk (db/complete-walk! walk-id)]
         (do
           ;; 報酬チェック
-          (db/check-and-unlock-rewards! (str (:walks/user-id walk)))
+          (db/check-and-unlock-rewards! (str (:walks/user_id walk)))
           (response/response
            {:walk {:id (str (:walks/id walk))
                    :status (:walks/status walk)
                    :steps (:walks/steps walk)
-                   :distance-meters (:walks/distance-meters walk)
-                   :start-time (str (:walks/start-time walk))
-                   :end-time (str (:walks/end-time walk))}}))
+                   :distance-meters (:walks/distance_meters walk)
+                   :start-time (str (:walks/start_time walk))
+                   :end-time (str (:walks/end_time walk))}}))
         (-> (response/response {:error "Walk not found or already completed"})
             (response/status 404)))
       (catch Exception e
@@ -93,12 +93,12 @@
                       (filter :walks/id)
                       (mapv (fn [w]
                               {:id (str (:walks/id w))
-                               :user-id (str (:walks/user-id w))
-                               :start-time (str (:walks/start-time w))
-                               :end-time (when (:walks/end-time w) (str (:walks/end-time w)))
+                               :user-id (str (:walks/user_id w))
+                               :start-time (str (:walks/start_time w))
+                               :end-time (when (:walks/end_time w) (str (:walks/end_time w)))
                                :status (if (= "in_progress" (:walks/status w)) "active" (:walks/status w))
                                :steps (or (:walks/steps w) 0)
-                               :distance-meters (or (:walks/distance-meters w) 0)})))}))
+                               :distance-meters (or (:walks/distance_meters w) 0)})))}))
       (catch Exception e
         (-> (response/response {:error "Failed to get walks"
                                :details (.getMessage e)})

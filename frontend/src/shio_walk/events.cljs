@@ -31,6 +31,11 @@
    (assoc db :error err :loading? false)))
 
 (rf/reg-event-db
+ :clear-error
+ (fn [db _]
+   (assoc db :error nil)))
+
+(rf/reg-event-db
  :set-loading
  (fn [db [_ v]]
    (assoc db :loading? v)))
@@ -50,6 +55,15 @@
     credentials
     #(rf/dispatch [:login-success %])
     #(rf/dispatch [:set-error "ログインに失敗しました"]))
+   {:db (assoc db :loading? true)}))
+
+(rf/reg-event-fx
+ :register
+ (fn [{:keys [db]} [_ user]]
+   (api/register
+    user
+    #(rf/dispatch [:login-success %])
+    #(rf/dispatch [:set-error "ユーザー登録に失敗しました"]))
    {:db (assoc db :loading? true)}))
 
 (rf/reg-event-db
@@ -103,6 +117,7 @@
 (rf/reg-event-db
  :stats-loaded
  (fn [db [_ stats]]
+   ;; stats は既にフラットなマップ（{:total-steps ...}）なのでそのまま
    (assoc db :stats stats)))
 
 (rf/reg-event-fx
@@ -116,7 +131,7 @@
 
 (rf/reg-event-db
  :rewards-loaded
- (fn [db [_ rewards]]
+ (fn [db [_ {:keys [rewards]}]]
    (assoc db :rewards rewards)))
 
 (rf/reg-event-fx
@@ -130,15 +145,16 @@
 
 (rf/reg-event-db
  :unlocked-rewards-loaded
- (fn [db [_ rewards]]
+ (fn [db [_ {:keys [rewards]}]]
    (assoc db :unlocked-rewards rewards)))
 
 (rf/reg-event-db
  :walks-loaded
- (fn [db [_ walks]]
+ (fn [db [_ {:keys [walks]}]]
    (let [active (first (filter #(= (:status %) "active") walks))]
-     (cond-> (assoc db :walks walks :loading? false)
-       active (assoc :current-walk active)))))
+     (-> db
+         (assoc :walks (vec walks) :loading? false)
+         (assoc :current-walk active)))))
 
 
 ;; --------------------
@@ -154,6 +170,11 @@
       (rf/dispatch [:load-walks]))
     #(rf/dispatch [:set-error "開始失敗"]))
    {:db (assoc db :loading? true)}))
+
+(rf/reg-event-db
+ :update-current-walk-local
+ (fn [db [_ data]]
+   (update db :current-walk merge data)))
 
 (rf/reg-event-fx
  :update-walk
@@ -174,9 +195,10 @@
     walk-id
     (fn [_]
       (rf/dispatch [:load-walks])
-      (rf/dispatch [:load-unlocked-rewards]))
+      (rf/dispatch [:load-unlocked-rewards])
+      (rf/dispatch [:load-stats]))
     #(rf/dispatch [:set-error "完了失敗"]))
-   {:db (assoc db :loading? true)}))
+   {:db (assoc db :loading? true :current-walk nil)}))
 
 (rf/reg-event-db
  :walk-started

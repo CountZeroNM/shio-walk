@@ -133,11 +133,19 @@
   (let [stats (get-user-stats user-id)
         steps (:user_stats/total_steps stats)
         distance-m (* (:user_stats/total_distance_km stats) 1000)]
-    (execute!
-     ["INSERT INTO user_rewards (user_id, reward_id)
-       SELECT ?::uuid, id FROM rewards
-       WHERE (threshold_type = 'steps' AND threshold_value <= ?)
-          OR (threshold_type = 'distance' AND threshold_value <= ?)
-       ON CONFLICT DO NOTHING
-       RETURNING *"
-      user-id steps distance-m])))
+    (let [new-rewards (execute!
+                       ["INSERT INTO user_rewards (user_id, reward_id)
+                         SELECT ?::uuid, id FROM rewards
+                         WHERE (threshold_type = 'steps' AND threshold_value <= ?)
+                            OR (threshold_type = 'distance' AND threshold_value <= ?)
+                         ON CONFLICT DO NOTHING
+                         RETURNING *"
+                        user-id steps distance-m])]
+      ;; 新しくアンロックされたものがある場合、統計のカウントを更新
+      (execute-one!
+       ["UPDATE user_stats
+         SET rewards_unlocked = (SELECT count(*) FROM user_rewards WHERE user_id = ?::uuid),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ?::uuid"
+        user-id user-id])
+      new-rewards)))
