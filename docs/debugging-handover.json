@@ -2,8 +2,8 @@
   "meta": {
     "project": "shio-walk",
     "document": "debugging-handover",
-    "version": "1.0.0",
-    "last_updated": "2025-12-18",
+    "version": "1.1.0",
+    "last_updated": "2026-03-06",
     "purpose": "Long-term debugging handover and recurrence prevention"
   },
 
@@ -28,18 +28,31 @@
       "UI switches momentarily after button click",
       "UI immediately reverts to previous state",
       "API returns success response",
-      "No fatal errors, only warnings or none"
+      "No fatal errors, only warnings or none",
+      "Distance becomes 0.00km after update",
+      "Completion fails with 500 Internal Server Error"
     ],
-    "root_cause": "State inconsistency caused by unstable API contract combined with optimistic UI updates",
+    "root_cause": "State inconsistency caused by unstable API contract and naming convention mismatch (Hyphen vs Underscore)",
     "classification": [
       "Race condition",
       "State overwrite",
-      "Contract violation"
+      "Contract violation",
+      "Naming convention mismatch"
     ]
   },
 
   "root_causes": {
     "api_contract_issues": [
+      {
+        "issue": "hyphen/underscore mismatch in backend handlers",
+        "details": [":walks/distance-meters (hyphen) vs :walks/distance_meters (underscore)"],
+        "impact": "DB results return nil when accessed with wrong key, leading to 0 values in API response"
+      },
+      {
+        "issue": "UUID parsing error from nil string",
+        "details": ["str nil -> \"nil\" passed as UUID to DB"],
+        "impact": "500 Internal Server Error during reward check or walk completion"
+      },
       {
         "issue": "status value inconsistency",
         "details": ["active", "in_progress"],
@@ -54,22 +67,17 @@
         "issue": "nil numeric values",
         "details": ["steps", "distance-meters"],
         "impact": "UI rendering errors and state invalidation"
-      },
-      {
-        "issue": "nil primary keys",
-        "details": ["id"],
-        "impact": "list rendering and diffing failures"
       }
     ],
     "frontend_state_issues": [
       "Optimistic update applied before API contract stabilized",
-      "load-walks event overwrote optimistic state",
-      "Multiple events writing to the same state keys"
+      "load-walks event overwrote optimistic state by receiving full map instead of collection",
+      "Missing :clear-error event handler preventing UI recovery"
     ]
   },
 
   "design_decisions": {
-    "chosen_approach": "Fix API contract instead of frontend absorption",
+    "chosen_approach": "Fix API contract and backend handler keys instead of frontend absorption",
     "rejected_alternatives": [
       "Frontend-side normalization",
       "Conditional rendering based on partial data",
@@ -85,17 +93,18 @@
 
   "key_learnings": {
     "re_frame_insight": "UI flicker or rollback almost always indicates state being overwritten by a later event",
+    "backend_gotcha": "Clojure handlers must use underscores for DB results but hyphens for API responses",
     "optimistic_update_warning": "Optimistic UI updates are unsafe unless API responses are fully stable and deterministic",
     "anti_absorption_rule": "Frontend absorption of API bugs creates future failures and should be avoided"
   },
 
   "debugging_checklists": {
     "api_checklist": [
-      "All response keys are kebab-case",
+      "All response keys are kebab-case (hyphen)",
+      "DB result access in handlers uses snake_case (underscore)",
       "Primary key :id is always present",
       "Numeric fields never return null",
-      "Status values are fixed and documented",
-      "All related endpoints return consistent structures"
+      "Status values are fixed and documented"
     ],
     "frontend_checklist": [
       "No duplicate reg-event registrations",
@@ -113,8 +122,8 @@
     },
     {
       "step": 2,
-      "action": "Validate key naming, status values, and nulls",
-      "goal": "Detect contract violations early"
+      "action": "Check for 'nil' values or wrong keys in backend handlers",
+      "goal": "Identify naming convention mismatches"
     },
     {
       "step": 3,
@@ -125,16 +134,12 @@
       "step": 4,
       "action": "Confirm which event overwrites expected state",
       "goal": "Locate rollback source"
-    },
-    {
-      "step": 5,
-      "action": "Fix API contract before touching frontend",
-      "goal": "Prevent recurrence"
     }
   ],
 
   "documentation_relationships": {
     "README": "Official project overview and specifications",
+    "GEMINI_md": "Core project mandates and naming convention trap warnings",
     "debug_notes_md": "Design reasoning, failures, and lessons learned",
     "debugging_handover_json": "Operational checklist and step-by-step debugging guide"
   },
@@ -149,4 +154,3 @@
     "goal": "Ensure knowledge continuity and prevent repeated failure patterns"
   }
 }
-
