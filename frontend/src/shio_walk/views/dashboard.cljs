@@ -48,8 +48,7 @@
          [:input {:type "number"
                   :value (:steps current-walk)
                   :on-change #(rf/dispatch
-                               [:update-walk
-                                (:id current-walk)
+                               [:update-current-walk-local
                                 {:steps (js/parseInt (-> % .-target .-value))}])
                   :disabled loading?}]
 
@@ -59,11 +58,10 @@
           "距離 (km):"]
          [:input {:type "number"
                   :step "0.01"
-                  :value (.toFixed (/ (:distance-meters current-walk) 1000) 2)
+                  :value (/ (:distance-meters current-walk) 1000)
                   :on-change #(rf/dispatch
-                               [:update-walk
-                                (:id current-walk)
-                                {:distance (js/parseFloat (-> % .-target .-value))}])
+                               [:update-current-walk-local
+                                {:distance-meters (* (js/parseFloat (-> % .-target .-value)) 1000)}])
                   :disabled loading?}]]
 
         [:div {:style {:display "flex" :gap "10px"}}

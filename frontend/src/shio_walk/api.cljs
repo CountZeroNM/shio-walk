@@ -8,13 +8,18 @@
     [:Authorization (str "Bearer " token)]))
 
 (defn register [user success-fn error-fn]
+  (js/console.log "API Registering user:" (clj->js user))
   (ajax/POST (str api-base-url "/auth/register")
              {:params user
               :format :json
               :response-format :json
               :keywords? true
-              :handler success-fn
-              :error-handler error-fn}))
+              :handler (fn [resp]
+                         (js/console.log "API Register Success:" (clj->js resp))
+                         (success-fn resp))
+              :error-handler (fn [error]
+                               (js/console.error "API Register Error:" (clj->js error))
+                               (error-fn error))}))
 
 (defn login [credentials success-fn error-fn]
   (ajax/POST (str api-base-url "/auth/login")

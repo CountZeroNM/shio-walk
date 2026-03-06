@@ -6,6 +6,7 @@
 ;; ===== ユーザー登録 =====
 
 (defn register [request]
+  (println "Register request body:" (:body request))
   (let [{:keys [email username password]} (:body request)]
     (cond
       ;; バリデーション
