@@ -50,12 +50,18 @@
 - 契約違反は API側を修正する
 
 ### Data Conventions（確定）
-- JSONキー: kebab-case
+- JSONキー: kebab-case（例: `:total-steps`）
 - Primary Key: id
 - Status:
     - Walks: "active", "completed"
 - 数値フィールドは nil 不可（必ず数値）
 - Timestamp: ISO-8601 UTC
+
+> [!WARNING]
+> **Implementation Note (Hyphen vs Underscore)**
+> バックエンドの Clojure 実装（Handlers 層）において、DB（`next.jdbc`）から返ってくるキーは `snake_case`（アンダースコア、例: `:walks/distance_meters`）です。
+> これを API レスポンスの `kebab-case`（ハイフン、例: `:distance-meters`）と混同して参照すると、`nil`（結果として0やパースエラー）が発生します。
+> 詳細は `GEMINI.md` の「4. 内部データと外部データのキー変換」を参照してください。
 
 ## 実装上の重要な学び（今回の核心）
 ### 問題の本質
