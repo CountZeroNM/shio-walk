@@ -371,6 +371,11 @@ DB_USER=shio_user DB_PASSWORD=shiopass DB_NAME=shio_walk clj -M:run
 ./backend/run.sh
 ```
 
+### 4. フロントエンド起動
+
+```bash
+npx shadow-cljs watch app
+```
 ---
 
 ## 動作確認（curl例）
