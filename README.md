@@ -376,6 +376,32 @@ DB_USER=shio_user DB_PASSWORD=shiopass DB_NAME=shio_walk clj -M:run
 ```bash
 npx shadow-cljs watch app
 ```
+
+---
+
+## データ整合性のトラブルシューティング（他環境での同期後など）
+
+他の環境から `git pull` した直後や、開発中にデータの不整合（時刻のズレ、重複したアクティブウォーク等）が発生した場合、以下の手順で DB 状態をクリーンにすることをお勧めします。
+
+### 1. DB 状態のリセット
+「ウォークを完了したのにすぐにウォーク中に戻る」「最新のデータがリストに出てこない」等の症状が出た場合、履歴データを一度初期化するのが確実です。
+
+```bash
+# Docker コンテナ内の PostgreSQL で履歴テーブルをリセット（ユーザーアカウントは保持）
+docker exec -it shio-walk-db psql -U shio_user -d shio_walk -c "TRUNCATE TABLE walks, user_stats, user_rewards CASCADE;"
+```
+
+### 2. マイグレーションの実行
+スキーマ変更（SQLファイルの追加）があった場合は、必ず以下を実行してください。
+
+```bash
+cd backend
+clj -M:migrate migrate
+```
+
+### 3. 注意：システム時刻の同期
+本アプリは DB の `CURRENT_TIMESTAMP` を使用して時間を記録します。ホストマシンや Docker コンテナの時刻が大幅にズレていると、`ORDER BY` などのクエリで意図しない挙動（最新のウォークがリストの下に埋もれる等）が発生するため、OS の時刻設定を確認してください。
+
 ---
 
 ## 動作確認（curl例）
