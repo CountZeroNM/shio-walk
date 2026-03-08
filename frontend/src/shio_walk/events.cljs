@@ -181,9 +181,13 @@
          token walk-id
          (fn [_]
            (sensors/stop-sensors!)
+           (when-let [timer-id (get-in db [:sensor :sync-timer-id])]
+             (js/clearInterval timer-id))
            (rf/dispatch [:load-walks])
            (rf/dispatch [:load-unlocked-rewards])
-           (rf/dispatch [:load-stats]))
+           (rf/dispatch [:load-stats])
+           ;; センサー状態の完全リセット
+           (rf/dispatch [:reset-sensor-state]))
          #(rf/dispatch [:set-error "完了処理に失敗しました"])))
       #(rf/dispatch [:set-error "最終データの保存に失敗したため、完了できませんでした"]))
      
@@ -194,22 +198,29 @@
 ;; ============================================================
 
 ;; センサー計測開始
-(rf/reg-event-db
+(rf/reg-event-fx
  :start-sensors
- (fn [db _]
-   (-> db
-       (assoc-in [:sensor :active?] true)
-       (assoc-in [:sensor :steps] 0)
-       (assoc-in [:sensor :distance-meters] 0)
-       (assoc-in [:sensor :last-position] nil)
-       (assoc-in [:sensor :error] nil))))
+ (fn [{:keys [db]} _]
+   ;; 3分（180,000ms）ごとに自動同期するタイマーを設定
+   (let [timer-id (js/setInterval #(rf/dispatch [:sync-sensor-data]) 180000)]
+     {:db (-> db
+              (assoc-in [:sensor :active?] true)
+              (assoc-in [:sensor :sync-timer-id] timer-id)
+              (assoc-in [:sensor :steps] 0)
+              (assoc-in [:sensor :distance-meters] 0)
+              (assoc-in [:sensor :last-position] nil)
+              (assoc-in [:sensor :error] nil))})))
 
 ;; センサー計測停止
 (rf/reg-event-fx
  :stop-sensors
  (fn [{:keys [db]} _]
    (sensors/stop-sensors!)
-   {:db (assoc-in db [:sensor :active?] false)}))
+   (when-let [timer-id (get-in db [:sensor :sync-timer-id])]
+     (js/clearInterval timer-id))
+   {:db (-> db
+            (assoc-in [:sensor :active?] false)
+            (assoc-in [:sensor :sync-timer-id] nil))}))
 
 ;; 歩行検出（DeviceMotion）
 (rf/reg-event-db
@@ -294,6 +305,17 @@
  (fn [db [_ msg]]
    (assoc-in db [:sensor :error] msg)))
 
+;; センサー状態リセット
+(rf/reg-event-db
+ :reset-sensor-state
+ (fn [db _]
+   (assoc db :sensor (assoc (:sensor db)
+                            :steps 0
+                            :distance-meters 0
+                            :last-position nil
+                            :active? false
+                            :sync-timer-id nil))))
+
 ;; センサー値を API に送信（定期同期用）
 (rf/reg-event-fx
  :sync-sensor-data
@@ -304,10 +326,15 @@
          token    (:token db)]
      (if (and walk-id token (pos? (+ steps dist-m)))
        (do
+         (js/console.log "Periodic sync starting..." {:steps steps :dist-m dist-m})
          (api/update-walk token walk-id
                           {:steps steps
                            :distance (/ dist-m 1000)}
-                          (fn [_] nil)   ;; サイレント更新
+                          (fn [_] 
+                            (js/console.log "Periodic sync success")
+                            (rf/dispatch [:load-walks]))
                           #(js/console.warn "sensor sync failed" %))
          {})
-       {}))))
+       (do
+         (js/console.log "Sync skipped: No active walk or no movement data")
+         {})))))
