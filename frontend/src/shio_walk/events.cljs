@@ -190,16 +190,15 @@
 ;; ============================================================
 
 ;; センサー計測開始
-(rf/reg-event-fx
+(rf/reg-event-db
  :start-sensors
- (fn [{:keys [db]} _]
-   (sensors/start-sensors!)
-   {:db (-> db
-            (assoc-in [:sensor :active?] true)
-            (assoc-in [:sensor :steps] 0)
-            (assoc-in [:sensor :distance-meters] 0)
-            (assoc-in [:sensor :last-position] nil)
-            (assoc-in [:sensor :error] nil))}))
+ (fn [db _]
+   (-> db
+       (assoc-in [:sensor :active?] true)
+       (assoc-in [:sensor :steps] 0)
+       (assoc-in [:sensor :distance-meters] 0)
+       (assoc-in [:sensor :last-position] nil)
+       (assoc-in [:sensor :error] nil))))
 
 ;; センサー計測停止
 (rf/reg-event-fx

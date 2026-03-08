@@ -1,6 +1,7 @@
 (ns shio-walk.views.dashboard
   (:require [re-frame.core :as rf]
-            [reagent.core :as r]))
+            [reagent.core :as r]
+            [shio-walk.sensors :as sensors]))
 
 ;; ============================================================
 ;; ヘッダー
@@ -181,7 +182,9 @@
                      :disabled  loading?}]]
 
            ;; センサー開始ボタン
-           [:button {:on-click #(rf/dispatch [:start-sensors])
+           [:button {:on-click (fn []
+                                 (sensors/start-sensors!)
+                                 (rf/dispatch [:start-sensors]))
                      :disabled loading?
                      :style    {:width "100%"
                                 :margin-bottom "8px"
