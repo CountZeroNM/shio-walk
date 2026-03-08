@@ -168,22 +168,26 @@
 (rf/reg-event-fx
  :complete-walk
  (fn [{:keys [db]} [_ walk-id]]
-   ;; ウォーク完了時にセンサーも停止
-   (sensors/stop-sensors!)
-   (api/complete-walk
-    (:token db)
-    walk-id
-    (fn [_]
-      (rf/dispatch [:load-walks])
-      (rf/dispatch [:load-unlocked-rewards])
-      (rf/dispatch [:load-stats]))
-    #(rf/dispatch [:set-error "完了失敗"]))
-   {:db (-> db
-            (assoc :loading? true :current-walk nil)
-            (assoc-in [:sensor :active?] false)
-            (assoc-in [:sensor :steps] 0)
-            (assoc-in [:sensor :distance-meters] 0)
-            (assoc-in [:sensor :last-position] nil))}))
+   (let [token (:token db)
+         steps (get-in db [:sensor :steps] 0)
+         dist-m (get-in db [:sensor :distance-meters] 0)]
+     ;; 1. まず最新の数値を保存 (sync)
+     (api/update-walk 
+      token walk-id 
+      {:steps steps :distance (/ dist-m 1000)}
+      (fn [_] 
+        ;; 2. 保存成功したら、完了 API を実行
+        (api/complete-walk
+         token walk-id
+         (fn [_]
+           (sensors/stop-sensors!)
+           (rf/dispatch [:load-walks])
+           (rf/dispatch [:load-unlocked-rewards])
+           (rf/dispatch [:load-stats]))
+         #(rf/dispatch [:set-error "完了処理に失敗しました"])))
+      #(rf/dispatch [:set-error "最終データの保存に失敗したため、完了できませんでした"]))
+     
+     {:db (assoc db :loading? true :current-walk nil)})))
 
 ;; ============================================================
 ;; センサー関連イベント
