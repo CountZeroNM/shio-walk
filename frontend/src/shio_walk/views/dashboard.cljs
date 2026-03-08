@@ -131,98 +131,109 @@
 (defn walk-control []
   (let [current-walk  @(rf/subscribe [:current-walk])
         loading?      @(rf/subscribe [:loading?])
-        sensor-active? @(rf/subscribe [:sensor/active?])]
-    [:div.container
-     [:h2 "ウォーキング"]
-     (if current-walk
-       [:div
-        [:p {:style {:color "#667eea" :font-weight "bold"}}
-         "🚶 ウォーキング中..."]
+        sensor-active? @(rf/subscribe [:sensor/active?])
+        ;; 手動入力用のローカル状態
+        local-steps (r/atom (str (:steps current-walk)))
+        local-dist  (r/atom (str (.toFixed (/ (:distance-meters current-walk) 1000) 3)))]
+    (fn []
+      (let [current-walk @(rf/subscribe [:current-walk])
+            sensor-active? @(rf/subscribe [:sensor/active?])]
+        [:div.container
+         [:h2 "ウォーキング"]
+         (if current-walk
+           [:div
+            [:p {:style {:color "#667eea" :font-weight "bold"}}
+             "🚶 ウォーキング中..."]
 
-        ;; センサー状態バー
-        [sensor-status-bar]
+            ;; センサー状態バー
+            [sensor-status-bar]
 
-        ;; センサー計測中 or 手動入力
-        (if sensor-active?
-          ;; --- センサー計測表示 ---
-          [:div
-           [sensor-live-display]
+            ;; センサー計測中 or 手動入力
+            (if sensor-active?
+              ;; --- センサー計測表示 (デフォルト) ---
+              [:div
+               [sensor-live-display]
 
-           ;; センサー停止ボタン（手動入力に戻る）
-           [:p {:style {:font-size "0.8em"
-                        :color "#9ca3af"
-                        :text-align "center"
-                        :cursor "pointer"
-                        :margin-top "8px"}
-                :on-click #(rf/dispatch [:stop-sensors])}
-            "手動入力に切り替える →"]]
+               ;; 手動入力への切り替えボタン
+               [:p {:style {:font-size "0.8em"
+                            :color "#9ca3af"
+                            :text-align "center"
+                            :cursor "pointer"
+                            :margin-top "8px"}
+                    :on-click #(rf/dispatch [:stop-sensors])}
+                "手動入力に切り替える →"]]
 
-          ;; --- 手動入力フォーム ---
-          [:div
-           [:div {:style {:margin "16px 0"}}
-            [:label {:style {:display "block" :margin-bottom "5px"}}
-             "歩数:"]
-            [:input {:type      "number"
-                     :value     (:steps current-walk)
-                     :on-change #(rf/dispatch
-                                  [:update-current-walk-local
-                                   {:steps (js/parseInt (-> % .-target .-value))}])
-                     :disabled  loading?}]
+              ;; --- 手動入力フォーム (副) ---
+              [:div
+               [:div {:style {:margin "16px 0"}}
+                [:label {:style {:display "block" :margin-bottom "5px"}}
+                 "歩数:"]
+                [:input {:type      "number"
+                         :value     @local-steps
+                         :on-change #(reset! local-steps (-> % .-target .-value))
+                         :on-blur   #(let [val (js/parseInt @local-steps)]
+                                       (when-not (js/isNaN val)
+                                         (rf/dispatch [:update-current-walk-local {:steps val}])))
+                         :disabled  loading?}]
 
-            [:label {:style {:display "block"
-                             :margin-bottom "5px"
-                             :margin-top "15px"}}
-             "距離 (km):"]
-            [:input {:type      "number"
-                     :step      "0.01"
-                     :value     (.toFixed (/ (:distance-meters current-walk) 1000) 3)
-                     :on-change #(rf/dispatch
-                                  [:update-current-walk-local
-                                   {:distance-meters (* (js/parseFloat (-> % .-target .-value)) 1000)}])
-                     :disabled  loading?}]]
+                [:label {:style {:display "block"
+                                 :margin-bottom "5px"
+                                 :margin-top "15px"}}
+                 "距離 (km):"]
+                [:input {:type      "number"
+                         :step      "0.01"
+                         :value     @local-dist
+                         :on-change #(reset! local-dist (-> % .-target .-value))
+                         :on-blur   #(let [val (js/parseFloat @local-dist)]
+                                       (when-not (js/isNaN val)
+                                         (rf/dispatch [:update-current-walk-local {:distance-meters (int (* val 1000))}])))
+                         :disabled  loading?}]]
 
-           ;; センサー開始ボタン
-           [:button {:on-click (fn []
-                                 (sensors/start-sensors!)
-                                 (rf/dispatch [:start-sensors]))
-                     :disabled loading?
-                     :style    {:width "100%"
-                                :margin-bottom "8px"
-                                :background "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"}}
-            "📱 センサー計測を開始"]])
+               ;; センサー開始ボタン (手動から戻る用)
+               [:button {:on-click (fn []
+                                     (sensors/start-sensors!)
+                                     (rf/dispatch [:start-sensors]))
+                         :disabled loading?
+                         :style    {:width "100%"
+                                    :margin-bottom "8px"
+                                    :background "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"}}
+                "📱 センサー計測に戻る"]])
 
-        ;; 操作ボタン（共通）
-        [:div {:style {:display "flex" :gap "10px" :margin-top "16px"}}
-         (when (not sensor-active?)
-           [:button {:on-click #(rf/dispatch
-                                 [:update-walk
-                                  (:id current-walk)
-                                  {:steps    (:steps current-walk)
-                                   :distance (/ (:distance-meters current-walk) 1000)}])
-                     :disabled loading?}
-            "保存"])
+            ;; 操作ボタン（共通）
+            [:div {:style {:display "flex" :gap "10px" :margin-top "16px"}}
+             (when (not sensor-active?)
+               [:button {:on-click #(rf/dispatch
+                                     [:update-walk
+                                      (:id current-walk)
+                                      {:steps    (js/parseInt @local-steps)
+                                       :distance (js/parseFloat @local-dist)}])
+                         :disabled loading?}
+                "保存"])
 
-         (when sensor-active?
-           [:button {:on-click (fn []
-                                 (rf/dispatch [:sync-sensor-data])
-                                 (js/setTimeout
-                                  #(rf/dispatch [:load-walks]) 500))
-                     :disabled loading?
-                     :style {:background "#e0e7ff" :color "#3730a3"}}
-            "📊 記録を保存"])
+             (when sensor-active?
+               [:button {:on-click (fn []
+                                     (rf/dispatch [:sync-sensor-data])
+                                     (js/setTimeout
+                                      #(rf/dispatch [:load-walks]) 500))
+                         :disabled loading?
+                         :style {:background "#e0e7ff" :color "#3730a3"}}
+                "📊 記録を保存"])
 
-         [:button {:on-click #(rf/dispatch [:complete-walk (:id current-walk)])
-                   :disabled loading?
-                   :style    {:background
-                              "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"}}
-          "✓ 完了"]]]
+             [:button {:on-click #(rf/dispatch [:complete-walk (:id current-walk)])
+                       :disabled loading?
+                       :style    {:background
+                                  "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"}}
+              "✓ 完了"]]]
 
-       ;; ウォーク未開始
-       [:div
-        [:p "ウォーキングを開始しましょう！"]
-        [:button {:on-click #(rf/dispatch [:start-walk])
-                  :disabled loading?}
-         "ウォーキング開始"]])]))
+           ;; ウォーク未開始
+           [:div
+            [:p "ウォーキングを開始しましょう！"]
+            [:button {:on-click (fn []
+                                  (sensors/start-sensors!) ;; ユーザー操作に同期してセンサー起動
+                                  (rf/dispatch [:start-walk]))
+                      :disabled loading?
+                      :style {:background "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"}}
+             "ウォーキング開始"]])]))))
 
 ;; ============================================================
 ;; ウォーク履歴
