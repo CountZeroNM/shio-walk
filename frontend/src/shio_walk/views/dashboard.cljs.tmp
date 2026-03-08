@@ -1,0 +1,28 @@
+(defn walks-history []
+  (let [walks @(rf/subscribe [:walks])]
+    [:div.container
+     [:h2 "ウォーク履歴"]
+     (if (empty? walks)
+       [:p "まだウォーク記録がありません"]
+       (into
+        [:div]
+        (for [walk (take 10 walks)]
+          [:div
+           {:key   (:id walk)
+            :style {:background    "#f5f5f5"
+                    :padding       "15px"
+                    :margin        "10px 0"
+                    :border-radius "8px"
+                    :border-left   (str "4px solid "
+                                        (if (= (:status walk) "completed")
+                                          "#38ef7d" "#667eea"))}}
+           [:div {:style {:display "flex" :justify-content "space-between" :align-items "center"}}
+            [:div
+             [:strong (if (= (:status walk) "completed") "✓ 完了" "進行中")]
+             [:p {:style {:margin "5px 0" :color "#666"}}
+              (str (:steps walk) "歩 / "
+                   (.toFixed (/ (:distance-meters walk) 1000) 2) "km")]
+             [:p {:style {:margin "0" :font-size "0.9em" :color "#999"}}
+              (:start-time walk)]]
+            (when (= (:status walk) "completed")
+              [:div {:style {:color "#38ef7d" :font-size "2em"}} "🏆"])]])))]))

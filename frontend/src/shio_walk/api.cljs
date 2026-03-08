@@ -1,7 +1,7 @@
 (ns shio-walk.api
   (:require [ajax.core :as ajax]))
 
-(def api-base-url "http://localhost:3000/api")
+(def api-base-url "https://192.168.171.12:3443/api")
 
 (defn auth-header [token]
   (when token
