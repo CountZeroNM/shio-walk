@@ -5,7 +5,7 @@
 
 (defn auth-header [token]
   (when token
-    [:Authorization (str "Bearer " token)]))
+    {"Authorization" (str "Bearer " token)}))
 
 (defn register [user success-fn error-fn]
   (js/console.log "API Registering user:" (clj->js user))
