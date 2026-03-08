@@ -141,6 +141,7 @@
     (:token db)
     (fn [{:keys [walk]}]
       (rf/dispatch [:walk-started walk])
+      (rf/dispatch [:start-sensors]) ;; 自動でセンサーモードへ
       (rf/dispatch [:load-walks]))
     #(rf/dispatch [:set-error "開始失敗"]))
    {:db (assoc db :loading? true)}))
