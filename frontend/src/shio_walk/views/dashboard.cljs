@@ -25,7 +25,9 @@
   (let [stats @(rf/subscribe [:stats])]
     [:div.container
      [:h2 "統計情報"]
-     [:div.stats-grid
+     [:div {:style {:display               "grid"
+                    :grid-template-columns "1fr 1fr"
+                    :gap                   "10px"}}
       [:div.stat-card
        [:div.stat-value (or (:total-steps stats) 0)]
        [:div.stat-label "累計歩数"]]
@@ -239,33 +241,49 @@
 ;; ウォーク履歴
 ;; ============================================================
 (defn walks-history []
-  (let [walks @(rf/subscribe [:walks])]
-    [:div.container
-     [:h2 "ウォーク履歴"]
-     (if (empty? walks)
-       [:p "まだウォーク記録がありません"]
-       (into
-        [:div]
-        (for [walk (take 10 walks)]
-          [:div
-           {:key   (:id walk)
-            :style {:background    "#f5f5f5"
-                    :padding       "15px"
-                    :margin        "10px 0"
-                    :border-radius "8px"
-                    :border-left   (str "4px solid "
-                                        (if (= (:status walk) "completed")
-                                          "#38ef7d" "#667eea"))}}
-           [:div {:style {:display "flex" :justify-content "space-between" :align-items "center"}}
-            [:div
-             [:strong (if (= (:status walk) "completed") "✓ 完了" "進行中")]
-             [:p {:style {:margin "5px 0" :color "#666"}}
-              (str (:steps walk) "歩 / "
-                   (.toFixed (/ (:distance-meters walk) 1000) 2) "km")]
-             [:p {:style {:margin "0" :font-size "0.9em" :color "#999"}}
-              (:start-time walk)]]
-            (when (= (:status walk) "completed")
-              [:div {:style {:color "#38ef7d" :font-size "2em"}} "🏆"])]])))]))
+  (let [expanded? (r/atom false)]
+    (fn []
+      (let [walks @(rf/subscribe [:walks])
+            display-walks (if @expanded? walks (take 3 walks))]
+        [:div.container
+         [:h2 "ウォーク履歴"]
+         (if (empty? walks)
+           [:p "まだウォーク記録がありません"]
+           [:div
+            (into
+             [:div]
+             (for [walk display-walks]
+               [:div
+                {:key   (:id walk)
+                 :style {:background    "#f5f5f5"
+                         :padding       "15px"
+                         :margin        "10px 0"
+                         :border-radius "8px"
+                         :border-left   (str "4px solid "
+                                             (if (= (:status walk) "completed")
+                                               "#38ef7d" "#667eea"))}}
+                [:div {:style {:display "flex" :justify-content "space-between" :align-items "center"}}
+                 [:div
+                  [:strong (if (= (:status walk) "completed") "✓ 完了" "進行中")]
+                  [:p {:style {:margin "5px 0" :color "#666"}}
+                   (str (:steps walk) "歩 / "
+                        (.toFixed (/ (:distance-meters walk) 1000) 2) "km")]
+                  [:p {:style {:margin "0" :font-size "0.9em" :color "#999"}}
+                   (:start-time walk)]]
+                 (when (= (:status walk) "completed")
+                   [:div {:style {:color "#38ef7d" :font-size "2em"}} "🏆"])]]))
+            (when (> (count walks) 3)
+              [:button {:style    {:width            "100%"
+                                   :background       "none"
+                                   :border           "1px dashed #667eea"
+                                   :color            "#667eea"
+                                   :padding          "10px"
+                                   :margin-top       "10px"
+                                   :border-radius    "8px"
+                                   :cursor           "pointer"
+                                   :text-align       "center"}
+                        :on-click #(swap! expanded? not)}
+               (if @expanded? "▲ 閉じる" (str "▼ 他の" (- (count walks) 3) "件を表示"))])])]))))
 
 ;; ============================================================
 ;; 報酬パネル
