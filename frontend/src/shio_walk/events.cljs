@@ -170,8 +170,8 @@
  :complete-walk
  (fn [{:keys [db]} [_ walk-id]]
    (let [token (:token db)
-         steps (get-in db [:sensor :steps] 0)
-         dist-m (get-in db [:sensor :distance-meters] 0)]
+         steps (get-in db [:current-walk :steps] 0)
+         dist-m (get-in db [:current-walk :distance-meters] 0)]
      ;; 1. まず最新の数値を保存 (sync)
      (api/update-walk 
       token walk-id 
@@ -322,8 +322,8 @@
  :sync-sensor-data
  (fn [{:keys [db]} _]
    (let [walk-id  (get-in db [:current-walk :id])
-         steps    (get-in db [:sensor :steps] 0)
-         dist-m   (get-in db [:sensor :distance-meters] 0)
+         steps    (get-in db [:current-walk :steps] 0)
+         dist-m   (get-in db [:current-walk :distance-meters] 0)
          token    (:token db)]
      (if (and walk-id token (pos? (+ steps dist-m)))
        (do
