@@ -1,54 +1,38 @@
 {
-  "document_type": "debugging_handover_guide",
+  "document_type": "project_status_handover",
   "project": "shio-walk",
+  "last_updated": "2026-03-08",
   "context": {
-    "problem_domain": "re-frame frontend + REST backend",
-    "symptom": "UI briefly updates then reverts after start-walk",
-    "severity": "High (core UX broken)"
-  },
-  "root_cause": {
-    "category": "State race condition",
-    "details": [
-      "Optimistic update applied via :walk-started",
-      ":walks-loaded event overwrote :current-walk with nil",
-      "re-frame last-event-wins behavior"
+    "status": "Production-ready PWA prototype",
+    "core_features": [
+      "iOS Safari compatible sensor integration",
+      "Robust data sync (Periodic + Foreground)",
+      "Refined manual input UI",
+      "Collapsible walk history"
     ]
   },
-  "final_solution": {
-    "principles": [
-      "Do not overwrite valid state with nil",
-      "Backend is source of truth, but frontend must guard state transitions",
-      "Use optimistic updates for user-triggered actions"
-    ],
-    "key_fixes": [
-      "Conditional update in :walks-loaded",
-      "Optimistic dispatch on :start-walk"
-    ]
+  "major_achievements": {
+    "pwa": "Full PWA support with manifest and Service Worker.",
+    "sensors": "DeviceMotion and Geolocation integrated with iOS security compliance (User Gesture requirement).",
+    "state_management": "Resolved race conditions between optimistic updates and API polls using strategic re-frame event design."
   },
   "lessons_learned": [
-    "If UI flickers then reverts, suspect async event collision",
-    "Logging API response is not sufficient; log state transitions",
-    "re-frame requires explicit state ownership"
+    "iOS Safari requires sync callstack from user gesture for sensor permissions.",
+    "VisibilityChange is essential for mobile PWA data sync reliability.",
+    "Merging local atom state with global app-db is best for stable form inputs."
   ],
-  "known_remaining_issues": [
-    "Editing steps/distance in active walk causes error"
+  "remaining_debt": [
+    "Hardcoded IP in api.cljs should be moved to build configuration.",
+    "Wake Lock API for keeping screen on during active tracking."
   ],
-  "next_steps": [
+  "future_roadmap": [
     {
-      "step": 1,
-      "task": "Fix walk-control input handling",
-      "hint": "Local reagent atom vs app-db sync"
+      "phase": "Deployment",
+      "task": "Set up production server with domain and valid SSL."
     },
     {
-      "step": 2,
-      "task": "Derive stats from backend response only",
-      "hint": "Avoid client-side recomputation"
-    },
-    {
-      "step": 3,
-      "task": "Add regression checklist for re-frame events",
-      "hint": "Ensure no event overwrites another's state"
+      "phase": "Features",
+      "task": "Implement image/audio reward delivery."
     }
   ]
 }
-

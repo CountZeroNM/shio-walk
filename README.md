@@ -21,11 +21,9 @@
 * 歩数・距離の累計統計を自動更新
 * 条件達成時に報酬をアンロック
 * JWT 認証によるユーザー管理
+* **PWA 対応**: ホーム画面追加、オフライン動作、スマートフォンセンサー連携
 
-現在は **バックエンド API およびフロントエンド（ClojureScript + Re-frame）の基本実装が完了** しており、
-ログイン → ダッシュボード表示 → ウォーキング開始 → 状態反映 までの一連の動作が可能です。
-
-一方で、アクティブウォーク中の歩数・距離入力 UI など、一部機能は改善途中です。
+現在は **全ての主要機能の実装が完了** しており、実機（iPhone Safari）での動作確認も済んでいます。
 
 ---
 
@@ -33,583 +31,75 @@
 
 ### 実装済み
 
+#### PWA / センサー連携 (New!)
+
+* **PWA 対応**: ホーム画面追加、オフラインキャッシュ（Service Worker）
+* **センサー計測**: 加速度センサー（歩数）および GPS（距離）のリアルタイム連携
+* **iOS Safari 互換性**: ユーザー操作に同期したセンサー起動、バックグラウンド制限を考慮した自動同期ロジック
+* **データ同期**: 3分おきの定期保存、および画面復帰時の即時同期（VisibilityChange）
+* **安全設計**: 完了ボタン押下時の自動最終保存、セッション終了時の状態リセット
+
 #### バックエンド
 
-* プロジェクト構造作成
 * PostgreSQL 環境構築（Docker Compose）
-* データベースマイグレーション
 * 認証システム（JWT / Buddy）
-* ユーザー登録・ログイン API
 * ウォーク管理 API（開始・更新・完了）
 * 統計情報の自動集計および報酬同期ロジック
-* 報酬アンロックロジック
-* API レスポンス形式の正規化（kebab-case / status 統一）およびハンドラ層のキー整合性確保
+* API レスポンス形式の正規化（kebab-case / status 統一）
 
 #### フロントエンド
 
-* ClojureScript + Reagent + Re-frame による SPA 構成
-* ログイン / ログアウト / 新規登録 UI
-* ダッシュボード表示
-* ウォーキング開始・状態表示
-* アクティブウォーク中の歩数・距離入力 UI（安定化済み）
-* 統計情報・報酬一覧表示
-* re-frame による状態管理（app-db）およびエラーハンドリング（閉じるボタン実装）
+* ClojureScript + Re-frame による SPA 構成
+* ダッシュボード表示（統計情報の 2列グリッド化、履歴の折りたたみ表示）
+* リアルタイムセンサー計測 UI（センサーモードをデフォルト化）
+* 手動入力の安定化（ローカル atom によるスムーズな数値入力）
 
-### 既知の未対応・改善予定
+---
 
-* スマートフォンセンサー連携
-* E2E テスト追加
-* UI/UX のさらなる洗練（アニメーション等）
+## スマートフォン実機での利用（PWA / センサー）
+
+### 動作環境
+* **iOS**: Safari (推奨)
+* **Android**: Chrome
+
+> [!CAUTION]
+> iOS の Chrome や LINE 内ブラウザでは、Apple の制限により加速度センサー（歩数計）が動作しません。必ず **Safari** を使用してください。
+
+### iOS Safari での準備
+1. **SSL証明書の信頼**: 自宅サーバーの IP アドレス（例: `https://192.168.171.12:3443/api/health`）にアクセスし、自己署名証明書を信頼してください。
+2. **センサー権限の許可**: 
+   * アプリ内の「ウォーキング開始」ボタンをタップした際に出る許可ダイアログで「許可」を選択してください。
+3. **ホーム画面に追加**: Safari の共有メニューから「ホーム画面に追加」を行うことで、フルスクリーンアプリとして利用可能です。
 
 ---
 
 ## 技術スタック
 
 ### バックエンド
-
-* **Language**: Clojure 1.11.1
-* **Framework**: Ring + Compojure
-* **Server**: Jetty
-* **Database**: PostgreSQL 15
-* **Auth**: JWT（Buddy）
+* **Clojure**: Ring + Compojure, Jetty, PostgreSQL, Buddy(JWT)
 
 ### フロントエンド
-
-* **Language**: ClojureScript
-* **Framework**: Reagent + Re-frame
-* **Build Tool**: shadow-cljs
-* **State Management**: re-frame
-
----
-
-## ディレクトリ構成
-
-```text
-shio-walk/
-├─ backend/
-│  ├─ deps.edn
-│  ├─ resources/
-│  │  └─ migrations/
-│  └─ src/shio_walk/
-│     ├─ core.clj        ; サーバー起動
-│     ├─ routes.clj      ; ルーティング定義
-│     ├─ middleware.clj  ; JWT認証など
-│     ├─ config.clj      ; 設定（DB接続等）
-│     ├─ db.clj          ; DB操作
-│     ├─ auth/
-│     ├─ walks/
-│     └─ rewards/
-├─ frontend/
-│  ├─ public/
-│  │  ├─ index.html
-│  │  ├─ css/style.css
-│  │  └─ js/
-│  │     ├─ main.js
-│  │     └─ manifest.edn
-│  └─ src/shio_walk/
-│     ├─ core.cljs      ; エントリーポイント
-│     ├─ db.cljs        ; app-db 定義
-│     ├─ events.cljs   ; re-frame events
-│     ├─ subs.cljs     ; re-frame subscriptions
-│     ├─ api.cljs      ; API 通信層
-│     └─ views/
-│        ├─ main.cljs
-│        ├─ login.cljs
-│        └─ dashboard.cljs
-├─ images/
-└─ README.md
-```
-
----
-## 開発メモ・引き継ぎ
-
-
-- [開発メモ MD](docs/debug-notes.md)
-- [API memo MD](docs/api.md)
-- [デバッグ引き継ぎ手順書 JSON](docs/debugging-handover.json)
-- [作業手順書 JSON](docs/playbook.json)
-- [開発Step&Plan JSON](docs/step-handover.json)
-- [LLM-HandOver JSON](docs/next-llm-handover.json)
-- [LLM-cli-worked-report JSON](docs/cli-workedreport.json)
-- [Study this Code](docs/study.md)
----
-
-## フロントエンド設計メモ
-
-* 状態管理は re-frame を使用
-* API は **Single Source of Truth** とする
-* フロントエンド側で API のデータ補正は行わない
-* ユーザー操作に対しては optimistic update を採用
-* 非同期イベントによる state 上書きを防ぐため、イベント責務を明確化
-
----
-
-## API Specification (v2.0)
-
-この API はフロントエンドにとっての唯一の信頼できる情報源（Single Source of Truth）です。
-API 仕様と実装が乖離した場合、フロントエンドでの吸収は禁止し、API 実装側を修正することを原則とします。
-
-（※ 主要エンドポイント・レスポンス例は後述）
-
----
-
-## 修正履歴（2025-12-18）
-
-* **不具合**: ウォーキング開始ボタンを押しても UI が更新されない問題
-* **原因**:
-
-  * API レスポンスのキー形式が不統一（snake_case / kebab-case 混在）
-  * `status` 値の不整合
-  * re-frame における非同期イベント競合により state が巻き戻る状態競合問題
-* **対応**:
-
-  * バックエンド API を正規化（kebab-case / status="active" 統一）
-  * `nil` 値を返さない API 契約に変更
-  * フロントエンドの state 更新フローを整理
-* **設計判断**:
-  * フロントエンドで API の不整合を吸収せず、契約境界である API 側を修正する方針を採用
-
-### 修正履歴（2026-03-08）
-* **不具合**: iOS Safari で「センサー計測を開始」をタップしても歩数センサーが反応しない（パーミッションダイアログが出ない）。
-* **原因**: 
-  * `DeviceMotionEvent.requestPermission` は、ユーザーのクリックイベントから直接（同期的に）呼び出される必要がある。
-  * re-frame の `event-fx` を介した非同期な呼び出しでは、ブラウザに「正当なユーザー操作」とみなされず拒否されていた。
-* **対応**: 
-  * `dashboard.cljs` のボタン `on-click` ハンドラ内で、直接 `sensors/start-sensors!` を呼び出す構成に変更。
-  * これにより、iOS Safari で確実に許可ダイアログをトリガーし、センサーを起動できるようにした。
-
----
-
-## UI/UX 設計上の考察・懸念事項
-
-### ウォーキングデータの保存タイミングと完了処理の整合性
-
-現状の UI では「📊 記録を保存（同期）」ボタンと「✓ 完了」ボタンが分かれています。これについて以下の懸念と改善案を検討しています。
-
-* **懸念点**: 
-  ユーザーが「保存」ボタンを押さずに「完了」ボタンを押下した場合、最新の歩数・距離データが DB に反映されないままウォークが終了してしまう可能性がある。
-  （※ 現在の `complete-walk` API は、DB 側の既存レコードを `completed` に変更するだけで、最終的な数値をボディに含めていないため）
-
-* **UX 的な理想挙動**:
-  1. **自動保存の強化**: センサー計測中は、一定歩数（例：100歩ごと）または一定時間ごとにサイレントに `sync-sensor-data` を実行し、不意のブラウザ終了でもデータが失われないようにする。
-  2. **完了ボタンの統合**: 「完了」ボタン押下時に、内部で強制的に最新のセンサー値を `sync`（保存）してから完了 API を叩く。ユーザーに「保存してから完了して」と強いるのは認知負荷が高いため、「完了 ＝ 最終保存 ＋ 終了」と定義するのが望ましい。
-
----
-
-- **補足**: 本問題は単なるAPI不整合ではなく、非同期イベントが競合した際に
-  re-frame の state が意図せず上書きされることでUIが巻き戻る「状態競合問題」でもあった。
-
----
-
-## 既知の問題
-
-* アクティブウォーク中に歩数・距離を直接編集するとエラーが発生する
-
-  * 次ステップで対応予定
-
----
-
-## 開発上の注意：キー命名規則
-
-本プロジェクトでは、データベースのカラム名（`snake_case` / アンダースコア）と API レスポンスのキー名（`kebab-case` / ハイフン）が異なります。Clojure コード内で DB の結果を扱う際は、以下の点に注意してください。
-
-- **DBの戻り値**: `next.jdbc` から返ってくるマップのキーは `:walks/distance_meters` のようにアンダースコアを使用します。
-- **APIレスポンス**: フロントエンドへ返す JSON のキーは `:distance-meters` のようにハイフンを使用します。
-- **参照**: 詳細は `GEMINI.md` の「4. 内部データと外部データのキー変換」および `docs/debug-notes.md` の「修正履歴（2026-03-06）」を参照してください。
+* **ClojureScript**: Reagent + Re-frame, shadow-cljs
 
 ---
 
 ## 今後の予定
 
-* [ ] アクティブウォーク入力 UI の修正
+* [x] アクティブウォーク入力 UI の修正
 * [ ] フロントエンドのテスト整備
-* [ ] スマートフォンセンサー連携設計
-* [ ] デプロイ準備
+* [x] スマートフォンセンサー連携設計・実装
+* [ ] 本番環境へのデプロイ準備（正式な証明書・ドメイン）
+* [ ] スリープ防止（Wake Lock API）の調査
+
+---
+
+## 修正履歴（2026-03-08）
+* **iOS Safari センサー対応**: ユーザー操作（クリック）に同期したセンサー起動への変更。
+* **データ同期の堅牢化**: 3分おきの自動同期、画面復帰時の即時同期、完了時の自動最終保存を実装。
+* **UI/UX 改善**: 統計パネルの 2列化、履歴の折りたたみ表示、手動入力の安定化。
+* **バグ修正**: 手動入力値が完了時に 0 に上書きされる問題を、参照先を `:current-walk` に一本化することで解消。
 
 ---
 
 ## ライセンス
-
 MIT License
-
-## 2. 設計とデバッグにおける基本方針（引き継ぎ用・超重要）
-
-### このプロジェクトで最も重要な設計原則
-
-本プロジェクトでは、以下の考え方を最優先とする。
-
-#### 1. APIは Single Source of Truth である
-
-フロントエンドは、バックエンドAPIが返すデータを「加工して辻辻を合わせる」ことをしない。
-データ形式や値の不整合が発生した場合、原則として **API実装側を修正する**。
-
-#### 2. UI状態は「再計算可能な最小単位」で保持する
-
-re-frame の app-db には、以下を直接保持しない方針を採る。
-
-* APIレスポンスをそのまま複製した状態
-* 将来 load API によって上書きされる一時的状態
-
-代わりに：
-
-* 正規化されたリスト（例: `:walks`）
-* そこから導出可能な状態（例: `current-walk` は subs で算出）
-
-を基本構造とする。
-
-#### 3. 「一瞬表示されて戻る」UIは、状態競合のサイン
-
-非同期API呼び出し後に UI が一瞬切り替わり、すぐ元に戻る場合、以下の可能性を最優先で疑う。
-
-* optimistic update と load API の競合
-* 同一イベント名の二重登録
-* derived state と stored state の二重管理
-
-この症状は UI の問題ではなく、**イベント順序・状態設計の問題**であることがほとんどである。
-
----
-
-## 3. 今回のデバッグから得られた重要な学び（核心）
-
-### 1. optimistic update は「部分的」に使う
-
-今回、`:start-walk` 後に UI が戻る問題の原因は以下だった。
-
-* start-walk で一時的に状態を更新
-* 直後に load-walks が古い一覧で上書き
-
-対応として：
-
-* optimistic update は「UI反応を早くするための最小限」に留める
-* 最終状態は必ず load API の結果で確定させる
-
-### 2. re-frame で同じ event-id を二重定義すると破滅する
-
-以下の警告は極めて危険なサインである。
-
-```
-re-frame: overwriting :event handler for: walks-loaded
-```
-
-これは：
-
-* ファイル分割やコピペで同名イベントを複数定義している
-* ロード順によって挙動が変わる
-
-という **再現性の低いバグの温床**になる。
-
-→ event-id は「グローバル一意」と認識する。
-
-### 3. 状態を「持つ」か「導出する」かを必ず選ぶ
-
-* ❌ `:current-walk` を db に直接保持
-* ⭕ `:walks` から subs で `current-walk` を導出
-
-この切り替えにより：
-
-* API再取得
-* 画面リロード
-* 非同期競合
-
-すべてに耐える構造になった。
-
-### 4. UIバグの8割は「状態設計」
-
-ボタンが反応しない、表示が戻る、値が消える等の問題は、DOMやCSSではなく **状態の流れ**が原因であることがほとんど。
-
----
-
-## 補足：API命名規則とフロントエンドでの扱い
-
-> NOTE:
-> フロントエンドでは API のレスポンスを直接状態として保持せず、
-> 正規化されたコレクション（例: `walks`）から subs により状態を導出する。
-> そのため API の命名規則違反や値の不整合は、
-> UI 側ではなく API 側で修正することを原則とする。
-
----
-## API memo
-
-## データベース構成
-
-* **users**: ユーザー情報
-* **walks**: ウォーキング記録
-* **user_stats**: 累計歩数・距離などの統計
-* **rewards**: 報酬マスタ
-* **user_rewards**: ユーザー獲得済み報酬
-
-### 初期報酬例
-
-* 1000歩: 最初の一歩
-* 5000歩: 頑張り屋さん
-* 10000歩: ウォーキングマスター
-* 1km: 1km走破
-* 5km: 5km走破
-
----
-
-## API エンドポイント
-
-### Public
-
-* `POST /api/auth/register` ユーザー登録
-* `POST /api/auth/login` ログイン
-* `GET /api/health` ヘルスチェック
-
-### Protected（JWT必須）
-
-* `GET /api/user/profile`
-* `POST /api/walks/start`
-* `PUT /api/walks/:id`
-* `POST /api/walks/:id/complete`
-* `GET /api/walks`
-* `GET /api/stats`
-* `GET /api/rewards`
-* `GET /api/rewards/unlocked`
-
----
-
-## ローカル開発環境構築
-
-### 1. DB 起動
-
-```bash
-docker compose up -d
-```
-
-### 2. マイグレーション
-
-```bash
-cd backend
-clj -M:migrate migrate
-```
-
-### 3. サーバー起動
-
-```bash
-cd backend
-DB_USER=shio_user DB_PASSWORD=shiopass DB_NAME=shio_walk clj -M:run
-```
-
-または
-
-```bash
-./backend/run.sh
-```
-
-### 4. フロントエンド起動
-
-```bash
-npx shadow-cljs watch app
-```
-
----
-
-## データ整合性のトラブルシューティング（他環境での同期後など）
-
-他の環境から `git pull` した直後や、開発中にデータの不整合（時刻のズレ、重複したアクティブウォーク等）が発生した場合、以下の手順で DB 状態をクリーンにすることをお勧めします。
-
-### 1. DB 状態のリセット
-「ウォークを完了したのにすぐにウォーク中に戻る」「最新のデータがリストに出てこない」等の症状が出た場合、履歴データを一度初期化するのが確実です。
-
-```bash
-# Docker コンテナ内の PostgreSQL で履歴テーブルをリセット（ユーザーアカウントは保持）
-docker exec -it shio-walk-db psql -U shio_user -d shio_walk -c "TRUNCATE TABLE walks, user_stats, user_rewards CASCADE;"
-```
-
-### 2. マイグレーションの実行
-スキーマ変更（SQLファイルの追加）があった場合は、必ず以下を実行してください。
-
-```bash
-cd backend
-clj -M:migrate migrate
-```
-
-### 3. 注意：システム時刻の同期
-本アプリは DB の `CURRENT_TIMESTAMP` を使用して時間を記録します。ホストマシンや Docker コンテナの時刻が大幅にズレていると、`ORDER BY` などのクエリで意図しない挙動（最新のウォークがリストの下に埋もれる等）が発生するため、OS の時刻設定を確認してください。
-
----
-
-## 動作確認（curl例）
-
-### ユーザー登録
-
-```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
-```
-
-### ログイン
-
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"test@example.com","password":"password123"}'
-```
-
----
-
-## API Specification (v2.0)
-
-このAPIはフロントエンドのための唯一の信頼できる情報源(Single Source of Truth)です。API仕様と実装が乖離した場合、フロントエンドでの吸収は禁止し、API実装側を修正することを原則とします。
-
-### 1. Data Conventions
-
-#### Key Naming
-すべてのJSONレスポンスのキーは **`kebab-case`** に統一します。
-
-- **OK**: `:total-steps`
-- **NG**: `:total_steps`, `:totalSteps`
-
-#### Primary Keys
-すべてのリソースのプライマリキーは **`:id`** に統一します。
-
-- **OK**: `:id`
-- **NG**: `:walk-id`, `:reward_id`
-
-#### Status Values
-ステータスを表すフィールドは、小文字の文字列で統一します。
-
-- **Walks**: `"active"`, `"completed"`
-
-#### Timestamps
-タイムスタンプはすべて **ISO-8601** 形式のUTC文字列で表現します。
-
-- **Example**: `"2025-12-18T12:30:00Z"`
-
-### 2. Authentication
-保護されたエンドポイントには、HTTPヘッダーにJWTを含める必要があります。
-
-```
-Authorization: Bearer <your-jwt-token>
-```
-
-### 3. Endpoint Examples
-
-#### `POST /api/walks/start`
-新しいウォーキングセッションを開始します。
-
-- **Response (200 OK)**
-  ```json
-  {
-    "walk": {
-      "id": "1e9d1b0a-0b9a-4c1c-9d1b-0a0b9a4c1c9d",
-      "user-id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
-      "start-time": "2025-12-18T10:00:00Z",
-      "status": "active",
-      "steps": 0,
-      "distance-meters": 0
-    }
-  }
-  ```
-
-#### `GET /api/walks`
-ユーザーの過去のウォーク履歴を取得します。
-
-- **Response (200 OK)**
-  ```json
-  {
-    "walks": [
-      {
-        "id": "1e9d1b0a-0b9a-4c1c-9d1b-0a0b9a4c1c9d",
-        "user-id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
-        "start-time": "2025-12-18T10:00:00Z",
-        "end-time": "2025-12-18T10:45:00Z",
-        "status": "completed",
-        "steps": 5231,
-        "distance-meters": 3800
-      }
-    ]
-  }
-  ```
-
-#### `GET /api/rewards`
-すべての報酬マスタリストを取得します。
-
-- **Response (200 OK)**
-  ```json
-  {
-    "rewards": [
-      {
-        "id": "f4c2e1d1-c2b3-4a5e-b6c7-d8e9f0a1b2c3",
-        "title": "最初の一歩",
-        "description": "初めてのウォーキングを記録する",
-        "threshold-type": "walks",
-        "threshold-value": 1,
-        "image-url": null,
-        "audio-url": null
-      },
-      {
-        "id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
-        "title": "1000歩達成",
-        "description": "1回のウォークで1000歩を達成する",
-        "threshold-type": "steps",
-        "threshold-value": 1000,
-        "image-url": null,
-        "audio-url": null
-      }
-    ]
-  }
-  ```
-
-#### `GET /api/rewards/unlocked`
-ユーザーが獲得した報酬のリストを取得します。
-
-- **Response (200 OK)**
-  ```json
-  {
-    "rewards": [
-      {
-        "id": "f4c2e1d1-c2b3-4a5e-b6c7-d8e9f0a1b2c3",
-        "title": "最初の一歩",
-        "description": "初めてのウォーキングを記録する",
-        "threshold-type": "walks",
-        "threshold-value": 1,
-        "image-url": null,
-        "audio-url": null,
-        "unlocked-at": "2025-12-18T10:45:00Z"
-      }
-    ]
-  }
-  ```
-
----
-
-## 修正履歴（2025-12-18）
-
-- **不具合**: ウォーキング開始ボタンを押してもUIが更新されない問題、およびリスト表示で`:key`警告が多発する問題。
-- **原因**: バックエンドAPIが返すJSONのデータ形式が不統一だったため。
-  - `start-walk` APIが `status: "in_progress"` を返していた。
-  - レスポンスのキーが `snake_case` と `kebab-case` が混在していた。
-  - 一部のデータで `:id` が `nil` になっていた。
-  - これらのデータの不整合が原因で、フロントエンドのre-frameが状態を正しく認識・更新できず、UIの再描画が失敗していた。
-- **対応**: APIを「唯一の信頼できる情報源」と位置づけ、バックエンドのレスポンスを正規化。
-  - すべてのAPIレスポンスのキーを `kebab-case` に統一。
-  - `start-walk` APIは必ず `status: "active"` を返すように修正。
-  - `id` が `nil` のデータはAPIレスポンスから除外。
-  - `distance-meters` などの数値が `nil` にならないようデフォルト値 `0` を設定。
-  - 上記の前提に基づき、フロントエンドのデータ吸収ロジックを削除・単純化。
-- **設計判断**: 将来の保守コストを最小化するため、フロントエンド側でAPIの不整合を吸収するのではなく、契約境界であるバックエンドAPI側を修正するアプローチを選択。これにより、フロントエンドは受け取ったデータをそのまま信頼して使用できるようになった。
-
----
-
-## 既知の問題と対応履歴
-
-* **DB認証失敗**: HikariCP が `:user` を認識しない
-
-  * 対応: `config.clj` に `:username` を追加
-
-* **ユーザー登録時エラー**: `execute-one!` が単一アリティ
-
-  * 対応: DB関数をマルチアリティ化
-
----
-> ⚠️ IMPORTANT
-
-> [!NOTE]
-> ##### 編集メモ
-> エクスクラメーションマークを行頭に付けるとアクティブに
-```
-![text](image/abc.png)
-```

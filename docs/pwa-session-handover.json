@@ -1,53 +1,53 @@
 {
   "session_summary": {
-    "title": "shio-walk PWA化 + センサー連携実装 (iOS Safari 安定化版)",
+    "title": "shio-walk PWA化 + センサー連携実装 (iOS Safari 最終安定版)",
     "date": "2026-03-08",
     "branch": "feature/pwa-sensor",
-    "status": "iOS Safari 用の User Gesture 制約に対応完了"
+    "status": "実装完了。iOS Safari での歩数・GPS計測、自動同期、UI/UX改善を全て適用済み。"
   },
 
-  "completed_work": [
+  "completed_features": [
     {
-      "phase": "1. 新規ファイル作成",
-      "files": [
-        {
-          "path": "frontend/src/shio_walk/sensors.cljs",
-          "description": "センサーコアロジック（DeviceMotion + Geolocation）",
-          "status": "v3: iOS Safari 互換性向上"
-        },
-        {
-          "path": "frontend/public/manifest.json",
-          "description": "PWAマニフェスト"
-        }
-      ]
+      "feature": "iOS Safari モーションセンサー対応",
+      "detail": "DeviceMotionEvent.requestPermission をユーザージェスチャー（ボタンタップ）に直結させ、確実に許可ダイアログをトリガー。"
     },
     {
-      "phase": "4. iOS Safari 対応（重要）",
-      "items": [
-        {
-          "issue": "DeviceMotionEvent.requestPermission は同期的なユーザージェスチャーを要求する",
-          "fix": "dashboard.cljs のボタン on-click から sensors/start-sensors! を直接呼び出すように変更 (re-frame event-fx 経由だと非同期になり拒否されるため)"
-        }
-      ]
+      "feature": "3分おきの定期自動同期",
+      "detail": "バックグラウンド制限を考慮した 3分間隔の同期に加え、VisibilityChange イベントによる画面復帰時の即時同期を実装。"
+    },
+    {
+      "feature": "完了ボタンの自動保存統合",
+      "detail": "「完了」ボタン押下時に最新のセンサー値を自動的にサーバーへ保存してからセッションを終了する安全設計。"
+    },
+    {
+      "feature": "手動入力の安定化",
+      "detail": "Reagent ローカル atom を導入し、入力中のカーソル飛びや数値消滅を防止。"
+    },
+    {
+      "feature": "モバイル最適化 UI",
+      "detail": "統計情報の 2列グリッド化、履歴表示の折りたたみ（アコーディオン）実装による視認性向上。"
     }
   ],
 
-  "sensors_cljs_versions": {
-    "v3": {
-      "status": "最新",
-      "fixes": [
-        {
-          "id": "IOS_USER_GESTURE_CONSTRAINT",
-          "fix": "UIコンポーネントの on-click から直接呼び出し、確実にパーミッションダイアログをトリガー"
-        }
-      ]
+  "technical_notes": [
+    {
+      "note": "API 認証ヘッダーの修正",
+      "detail": "cljs-ajax の仕様に合わせ、auth-header を [:Authorization ...] (vector) から {\"Authorization\" ...} (map) に修正。"
+    },
+    {
+      "note": "データソースの統一",
+      "detail": "同期・完了時の参照先を :sensor バッファではなく :current-walk に一本化し、手動修正内容が確実に反映されるように変更。"
     }
+  ],
+
+  "verification_results": {
+    "ios_safari": "歩数・距離ともに正常動作確認済み。画面ロック解除時の自動同期も機能することを確認。",
+    "manual_input": "手動修正後の「保存」または「完了」で正しく DB に反映されることを確認。"
   },
 
-  "verification_status": {
-    "step_counter": {
-      "status": "修正済み（再テスト待ち）",
-      "notes": "iOS Safari でボタンタップ時にパーミッションダイアログが出るはずです。"
-    }
-  }
+  "next_steps": [
+    "feature/pwa-sensor ブランチの main へのマージ",
+    "本番環境（ドメイン取得・正式証明書）へのデプロイ準備",
+    "スリープ防止（Wake Lock API）の更なる調査"
+  ]
 }
