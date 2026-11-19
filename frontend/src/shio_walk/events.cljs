@@ -126,10 +126,16 @@
 (rf/reg-event-db
  :walks-loaded
  (fn [db [_ {:keys [walks]}]]
-   (let [active (first (filter #(= (:status %) "active") walks))]
+   (let [active (first (filter #(= (:status %) "active") walks))
+         local  (:current-walk db)
+         ;; センサーで計測中の同じウォークは、手元の値のほうが新しい (サーバーへはまだ送っていない分がある)。
+         ;; サーバーの古い値で上書きすると、表示が一瞬戻ったり、次の保存で歩数が減ったりする
+         measuring? (and active (get-in db [:sensor :active?]) (= (:id active) (:id local)))]
      (-> db
          (assoc :walks (vec walks) :loading? false)
-         (assoc :current-walk active)))))
+         (assoc :current-walk (if measuring?
+                                (merge active (select-keys local [:steps :distance-meters]))
+                                active))))))
 
 ;; --------------------
 ;; ウォーク操作
@@ -147,13 +153,6 @@
    {:db (assoc db :loading? true)}))
 
 (rf/reg-event-db
- :walk-started
- (fn [db [_ walk]]
-   (-> db
-       (assoc :current-walk walk)
-       (assoc :loading? false))))
-
-(rf/reg-event-db
  :update-current-walk-local
  (fn [db [_ data]]
    (update db :current-walk merge data)))
@@ -161,38 +160,40 @@
 (rf/reg-event-fx
  :update-walk
  (fn [{:keys [db]} [_ walk-id data]]
+   ;; data は {:steps 整数 :distance-meters 数値}
    (api/update-walk (:token db) walk-id data
                     (fn [_] (rf/dispatch [:load-walks]))
                     #(rf/dispatch [:set-error "更新失敗"]))
    {}))
 
+(defn walk-values
+  "API に送る {:steps 整数 :distance-meters 数値} (current-walk の値から)"
+  [walk]
+  {:steps           (js/Math.round (or (:steps walk) 0))
+   :distance-meters (or (:distance-meters walk) 0)})
+
+;; 手動入力の「保存」。入力欄の on-blur (:update-current-walk-local) のあとに処理されるので、最新の値を送る
+(rf/reg-event-fx
+ :save-current-walk
+ (fn [{:keys [db]} _]
+   (when-let [walk (:current-walk db)]
+     {:dispatch [:update-walk (:id walk) (walk-values walk)]})))
+
 (rf/reg-event-fx
  :complete-walk
  (fn [{:keys [db]} [_ walk-id]]
-   (let [token (:token db)
-         steps (get-in db [:current-walk :steps] 0)
-         dist-m (get-in db [:current-walk :distance-meters] 0)]
-     ;; 1. まず最新の数値を保存 (sync)
-     (api/update-walk 
-      token walk-id 
-      {:steps steps :distance (/ dist-m 1000)}
-      (fn [_] 
-        ;; 2. 保存成功したら、完了 API を実行
-        (api/complete-walk
-         token walk-id
-         (fn [_]
-           (sensors/stop-sensors!)
-           (when-let [timer-id (get-in db [:sensor :sync-timer-id])]
-             (js/clearInterval timer-id))
-           (rf/dispatch [:load-walks])
-           (rf/dispatch [:load-unlocked-rewards])
-           (rf/dispatch [:load-stats])
-           ;; センサー状態の完全リセット
-           (rf/dispatch [:reset-sensor-state]))
-         #(rf/dispatch [:set-error "完了処理に失敗しました"])))
-      #(rf/dispatch [:set-error "最終データの保存に失敗したため、完了できませんでした"]))
-     
-     {:db (assoc db :loading? true :current-walk nil)})))
+   ;; 最新の歩数・距離を最終値として渡し、保存と完了を 1 回の API で行う。
+   ;; 失敗したときは current-walk を消さないので、もう一度押せる
+   (api/complete-walk
+    (:token db) walk-id (walk-values (:current-walk db))
+    (fn [_]
+      (rf/dispatch [:stop-sensors])
+      (rf/dispatch [:reset-sensor-state])
+      (rf/dispatch [:load-walks])
+      (rf/dispatch [:load-unlocked-rewards])
+      (rf/dispatch [:load-stats]))
+    #(rf/dispatch [:set-error "完了処理に失敗しました。もう一度押してください"]))
+   {:db (assoc db :loading? true)}))
 
 ;; ============================================================
 ;; センサー関連イベント
@@ -203,14 +204,31 @@
  :start-sensors
  (fn [{:keys [db]} _]
    ;; 3分（180,000ms）ごとに自動同期するタイマーを設定
-   (let [timer-id (js/setInterval #(rf/dispatch [:sync-sensor-data]) 180000)]
+   ;; :sensor の steps / distance-meters は「センサーを動かし始めてからの分」。
+   ;; ウォークの値は 起点 (base-*) + その分 にする。再読み込みや手動入力のあとでセンサーを動かしても、
+   ;; それまでの記録を 0 から数え直して上書きしない
+   (when-let [old (get-in db [:sensor :sync-timer-id])] (js/clearInterval old))
+   (let [timer-id (js/setInterval #(rf/dispatch [:sync-sensor-data]) 180000)
+         walk     (:current-walk db)]
      {:db (-> db
               (assoc-in [:sensor :active?] true)
               (assoc-in [:sensor :sync-timer-id] timer-id)
               (assoc-in [:sensor :steps] 0)
               (assoc-in [:sensor :distance-meters] 0)
+              (assoc-in [:sensor :base-steps] (or (:steps walk) 0))
+              (assoc-in [:sensor :base-distance-meters] (or (:distance-meters walk) 0))
               (assoc-in [:sensor :last-position] nil)
               (assoc-in [:sensor :error] nil))})))
+
+(rf/reg-event-db
+ :walk-started
+ (fn [db [_ walk]]
+   ;; 開始の応答が来たら、センサーの起点をそのウォークの値に合わせる
+   ;; (進行中のウォークが返ってきたときは、その歩数・距離から数え足す)
+   (-> db
+       (assoc :current-walk walk :loading? false)
+       (assoc-in [:sensor :base-steps] (- (or (:steps walk) 0) (get-in db [:sensor :steps] 0)))
+       (assoc-in [:sensor :base-distance-meters] (- (or (:distance-meters walk) 0) (get-in db [:sensor :distance-meters] 0))))))
 
 ;; センサー計測停止
 (rf/reg-event-fx
@@ -230,12 +248,9 @@
    (let [new-steps (inc (get-in db [:sensor :steps] 0))
          walk-id   (get-in db [:current-walk :id])]
      ;; app-db の sensor を更新
-     (let [updated-db (assoc-in db [:sensor :steps] new-steps)]
-       ;; current-walk にも反映（表示用）
-       (if walk-id
-         (-> updated-db
-             (assoc-in [:current-walk :steps] new-steps))
-         updated-db)))))
+     (cond-> (assoc-in db [:sensor :steps] new-steps)
+       walk-id (assoc-in [:current-walk :steps]
+                         (+ (get-in db [:sensor :base-steps] 0) new-steps))))))
 
 ;; GPS 位置更新
 (rf/reg-event-db
@@ -255,7 +270,8 @@
          (assoc-in [:sensor :distance-meters] new-dist)
          ;; current-walk にも反映
          (cond-> walk-id
-           (assoc-in [:current-walk :distance-meters] (int new-dist)))))))
+           (assoc-in [:current-walk :distance-meters]
+                     (js/Math.round (+ (get-in db [:sensor :base-distance-meters] 0) new-dist))))))))
 
 ;; GPS 開始通知
 (rf/reg-event-db
@@ -321,21 +337,19 @@
 (rf/reg-event-fx
  :sync-sensor-data
  (fn [{:keys [db]} _]
-   (let [walk-id  (get-in db [:current-walk :id])
-         steps    (get-in db [:current-walk :steps] 0)
-         dist-m   (get-in db [:current-walk :distance-meters] 0)
-         token    (:token db)]
-     (if (and walk-id token (pos? (+ steps dist-m)))
-       (do
-         (js/console.log "Periodic sync starting..." {:steps steps :dist-m dist-m})
-         (api/update-walk token walk-id
-                          {:steps steps
-                           :distance (/ dist-m 1000)}
-                          (fn [_] 
-                            (js/console.log "Periodic sync success")
-                            (rf/dispatch [:load-walks]))
-                          #(js/console.warn "sensor sync failed" %))
-         {})
-       (do
-         (js/console.log "Sync skipped: No active walk or no movement data")
-         {})))))
+   ;; 応答で current-walk は書き換えない (送ったあとも計測は続いているので、手元の値のほうが新しい)
+   (let [walk  (:current-walk db)
+         token (:token db)]
+     (when (and (:id walk) token (get-in db [:sensor :active?]))
+       (api/update-walk token (:id walk) (walk-values walk)
+                        (fn [_] nil)
+                        #(js/console.warn "sensor sync failed" %)))
+     {})))
+
+;; 画面が隠れる (ロック・アプリ切り替え) ときと戻ったときに、計測中なら保存する。
+;; 隠れている間はセンサーが止まることが多いので、隠れる直前の保存が大事 (core.cljs で登録)
+(rf/reg-event-fx
+ :app-visibility-changed
+ (fn [{:keys [db]} [_ _visible?]]
+   (when (get-in db [:sensor :active?])
+     {:dispatch [:sync-sensor-data]})))

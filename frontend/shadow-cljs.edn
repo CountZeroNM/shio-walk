@@ -1,17 +1,30 @@
-{:source-paths ["src"]
- 
+{:source-paths ["src" "test" "dev"]
+
  :dependencies [[reagent "1.2.0"]
                 [re-frame "1.3.0"]
                 [day8.re-frame/http-fx "0.2.4"]
                 [cljs-ajax "0.8.4"]]
- 
+
+ ;; 開発用のサーバー。public/ を出し、それ以外 (/api/...) はバックエンドへ転送する。
+ ;; 画面と API が同じ Origin になるので、CORS も API 用の証明書も要らない。
+ ;; スマホから試すときは 0.0.0.0 で待ち、nginx などで https にする (docs/SETUP.md)
+ :dev-http {8080 {:root "public"
+                  :host "0.0.0.0"
+                  :proxy-url #shadow/env ["SHIO_BACKEND" :default "http://localhost:3000"]
+                  :proxy-predicate shio-walk.dev-http/api-request?}}
+
  :builds
  {:app
   {:target :browser
    :output-dir "public/js"
    :asset-path "/js"
    :modules {:main {:init-fn shio-walk.core/init}}
-   :devtools {:http-root "public"
-              :http-port 8080
-              :http-host "0.0.0.0"}}}}
-;              :preloads [devtools.preload]}}}}
+   ;; API の場所 (src/shio_walk/api.cljs の API_BASE)。既定は同じ Origin の /api
+   :closure-defines {shio-walk.api/API_BASE #shadow/env ["SHIO_API_BASE" :default "/api"]}}
+
+  ;; イベントのテスト (node で動かす): npm test
+  ;; (cljs-ajax が node で読む xmlhttprequest は test/node_stub の空の代用品を NODE_PATH で渡す)
+  :test
+  {:target :node-test
+   :output-to "out/test.js"
+   :ns-regexp "-test$"}}}

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "shadow-cljs watch app",
     "build": "shadow-cljs release app",
-    "server": "shadow-cljs server"
+    "server": "shadow-cljs server",
+    "test": "shadow-cljs compile test && NODE_PATH=test/node_stub node out/test.js"
   },
   "dependencies": {
     "react": "^18.2.0",

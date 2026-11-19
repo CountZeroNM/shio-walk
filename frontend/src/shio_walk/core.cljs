@@ -15,6 +15,11 @@
   (rf/clear-subscription-cache!)
   (rdom/render root [views/main-panel]))
 
+(defonce visibility-listener
+  ;; 画面が隠れる (ロック・アプリ切り替え) / 戻るときに、計測中なら保存する (events.cljs :app-visibility-changed)
+  (.addEventListener js/document "visibilitychange"
+                     #(rf/dispatch [:app-visibility-changed (= "visible" (.-visibilityState js/document))])))
+
 (defn init []
   (rf/dispatch-sync [:initialize-db])
   (mount-root))

@@ -1,7 +1,7 @@
 // ShioWalk Service Worker
 // 静的アセットをキャッシュし、オフライン時でもUIを表示できるようにする
 
-const CACHE_NAME = "shio-walk-v1";
+const CACHE_NAME = "shio-walk-v2";
 
 // キャッシュする静的アセット
 const STATIC_ASSETS = [
@@ -41,12 +41,15 @@ self.addEventListener("activate", (event) => {
 });
 
 // フェッチ戦略:
-//   - API リクエスト (/api/*): Network First（常に最新データを取得、失敗時はエラー）
-//   - 静的アセット: Cache First（キャッシュ優先、なければネットワーク）
+//   - API リクエスト (/api/*): ネットワークのみ (キャッシュしない。失敗時は 503 の JSON)
+//   - 画面のファイル: ネットワーク優先、つながらないときだけキャッシュ
+//     (キャッシュ優先にすると、更新した main.js がスマホに届かなくなる)
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+  if (event.request.method !== "GET" || url.origin !== self.location.origin) {
+    return;
+  }
 
-  // API リクエストはキャッシュしない（Network First）
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -62,20 +65,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 静的アセット: Cache First
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request).then((response) => {
-        // 正常なレスポンスをキャッシュに追加
+    fetch(event.request)
+      .then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });

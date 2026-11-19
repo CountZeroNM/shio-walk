@@ -51,3 +51,12 @@ node_modules/
 /tmp/
 .clj-kondo/
 .lsp/
+
+# 証明書・秘密鍵 (mkcert などで各自作る。コミットしない)
+*.pem
+*.key
+# 作業用のトークンや ID の控え
+backend/token.txt
+backend/walk_id.txt
+cleanup_walks.sh
+/frontend/out/
