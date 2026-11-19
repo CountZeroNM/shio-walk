@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS user_stats;
+--;;
+DROP TABLE IF EXISTS walks;

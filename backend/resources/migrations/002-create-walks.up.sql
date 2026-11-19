@@ -1,5 +1,4 @@
--- :up
-CREATE TABLE walks (
+CREATE TABLE IF NOT EXISTS walks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   start_time TIMESTAMP NOT NULL,
@@ -10,12 +9,13 @@ CREATE TABLE walks (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_walks_user_id ON walks(user_id);
-CREATE INDEX idx_walks_start_time ON walks(start_time DESC);
-
+--;;
+CREATE INDEX IF NOT EXISTS idx_walks_user_id ON walks(user_id);
+--;;
+CREATE INDEX IF NOT EXISTS idx_walks_start_time ON walks(start_time DESC);
+--;;
 -- 統計テーブル
-CREATE TABLE user_stats (
+CREATE TABLE IF NOT EXISTS user_stats (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   total_steps BIGINT DEFAULT 0,
   total_distance_km NUMERIC(10, 2) DEFAULT 0,
@@ -23,4 +23,3 @@ CREATE TABLE user_stats (
   rewards_unlocked INTEGER DEFAULT 0,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-

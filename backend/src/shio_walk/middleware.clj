@@ -1,7 +1,7 @@
 (ns shio-walk.middleware
-  (:require [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
-            [ring.middleware.cors :as cors]
+  (:require [ring.middleware.cors :as cors]
             [shio-walk.auth.core :as auth]
+            [shio-walk.config :refer [config]]
             [ring.util.response :as response]))
 
 ;; JWT認証ミドルウェア
@@ -9,7 +9,7 @@
   (fn [request]
     (let [auth-header (get-in request [:headers "authorization"])
           token (when auth-header
-                  (second (re-find #"Bearer (.+)" auth-header)))]
+                  (second (re-find #"^Bearer (.+)$" auth-header)))]
       (if token
         (if-let [claims (auth/verify-token token)]
           (handler (assoc request :user-id (:user-id claims)))
@@ -19,26 +19,25 @@
             (response/status 401))))))
 
 ;; CORSミドルウェア
+;; 認証は Authorization ヘッダ (Cookie ではない) なので credentials は許さない
 (defn wrap-cors [handler]
-  (cors/wrap-cors handler
-                  :access-control-allow-origin [#".*"]
-                  :access-control-allow-methods [:get :post :put :delete :options]
-                  :access-control-allow-headers ["Content-Type" "Authorization"]
-                  :access-control-allow-credentials "true"))
+  (let [origins (get-in config [:cors :origins])]
+    (cors/wrap-cors handler
+                    :access-control-allow-origin (if (seq origins)
+                                                   (mapv #(re-pattern (java.util.regex.Pattern/quote %)) origins)
+                                                   [#".*"])
+                    :access-control-allow-methods [:get :post :put :delete :options]
+                    :access-control-allow-headers ["Content-Type" "Authorization"])))
 
 ;; エラーハンドリングミドルウェア
+;; 想定外の例外はサーバーのログに出し、クライアントには中身を返さない
 (defn wrap-error-handling [handler]
   (fn [request]
     (try
       (handler request)
       (catch Exception e
-        (-> (response/response {:error "Internal server error"
-                               :message (.getMessage e)})
+        (binding [*out* *err*]
+          (println "ERROR" (:request-method request) (:uri request) "-" (.getMessage e)))
+        (.printStackTrace e)
+        (-> (response/response {:error "Internal server error"})
             (response/status 500))))))
-
-;; 統合ミドルウェア（オプション）
-(defn wrap-middlewares [handler]
-  (-> handler
-      (wrap-json-body {:keywords? true})
-      wrap-json-response
-      wrap-cors))

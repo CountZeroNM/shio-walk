@@ -1,11 +1,13 @@
 (ns shio-walk.core
   (:require [ring.adapter.jetty :refer [run-jetty]]
             [shio-walk.routes :refer [app]]
-            [shio-walk.config :refer [config]])
+            [shio-walk.config :refer [config dev-secret]])
   (:gen-class))
 
-(defn -main [& args]
+(defn -main [& _args]
   (let [port (get-in config [:server :port])]
+    (when (= dev-secret (get-in config [:auth :secret]))
+      (println "WARNING: JWT_SECRET が未設定なので開発用の鍵で署名します。外から使えるサーバーでは必ず設定してください。"))
     (println (str "Starting server on port " port "..."))
     (println "Available endpoints:")
     (println "  POST   /api/auth/register")
