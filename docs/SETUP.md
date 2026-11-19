@@ -1,235 +1,95 @@
-# shio-walk セットアップ手順書
+# スマートフォンから試す準備
 
-## 環境情報
+センサー (DeviceMotion) と GPS (Geolocation) は **安全な接続 (https か localhost) でしか使えません**。
+PC で動かしているアプリをスマホから開くには、次のどちらかを使います。
 
-| 項目 | 内容 |
-|------|------|
-| OS | antiX Linux |
-| Java | OpenJDK 21 |
-| Clojure CLI | 1.12.1.1550 |
-| Docker | 29.1.2 |
-| PCのIPアドレス | 192.168.171.12 |
-
----
-
-## 構成図
+PC 側はどちらも README の「動かし方」と同じです (DB・バックエンド・`npx shadow-cljs watch app`)。
+開発サーバー (8080) が画面を出し、`/api/` をバックエンド (3000) へ転送するので、**スマホから見える入口は 8080 の 1 つだけ**です
+(以前は API 用に 3443 を別に開き、`api.cljs` の URL を書き換えていましたが、もう要りません)。
 
 ```
-iPhone/Android
-    │
-    ├─ https://192.168.171.12:8443  ─→ nginx ─→ shadow-cljs (localhost:8080)
-    └─ https://192.168.171.12:3443  ─→ nginx ─→ Jetty/Backend (localhost:3000)
-                                          ↓
-                                    PostgreSQL (Docker:5432)
+スマホ ──(A: USB で localhost:8080) または (B: https://PCのIP:8443 → nginx)──→ shadow-cljs :8080
+                                                                           ├─ 画面 (public/)
+                                                                           └─ /api/ → バックエンド :3000 → PostgreSQL
 ```
 
----
+## A. Android: USB でつないで localhost として開く (おすすめ・証明書が要らない)
 
-## 初回セットアップ（一度だけ）
+スマホの Chrome から見て `http://localhost:8080` は安全な接続として扱われるので、証明書の準備が要りません。
 
-### 1. mkcert でローカルSSL証明書を発行
+1. Android の「開発者向けオプション」で「USB デバッグ」をオンにし、USB で PC とつなぐ
+2. PC で `adb reverse tcp:8080 tcp:8080`
+   (adb が無ければ、PC の Chrome の `chrome://inspect/#devices` →「Port forwarding」で 8080 → localhost:8080 を足しても同じ)
+3. スマホの Chrome で `http://localhost:8080` を開く
+
+Chromebook の Linux 環境で開発しているときは、USB 機器を Linux に渡す設定 (設定 → デベロッパー → Linux → USB 機器) が必要です。
+
+## B. Wi-Fi 越しに https で開く (iPhone も同じ方法)
+
+mkcert でその PC の IP 用の証明書を作り、nginx で https にして 8080 へ転送します。
+
+### 証明書を作る (1 回だけ)
 
 ```bash
-cd ~/projects/shio-walk
 mkcert -install
-mkcert 192.168.171.12
-# → 192.168.171.12.pem と 192.168.171.12-key.pem が生成される
+mkdir -p ~/.local/share/shio-walk-certs && cd ~/.local/share/shio-walk-certs
+mkcert 192.168.x.x            # PC の IP。192.168.x.x.pem と 192.168.x.x-key.pem ができる
 ```
 
-### 2. nginx 設定ファイルを作成
+> [!CAUTION]
+> 証明書と秘密鍵 (`*.pem`) はリポジトリに入れないでください (`.gitignore` で除外済み)。
+> 以前 `192.168.171.12-key.pem` がコミットされたことがあり、公開リポジトリの履歴に残っています。その証明書は使わず作り直してください。
 
-```bash
-sudo tee /etc/nginx/sites-available/shio-walk << 'EOF'
+スマホ側にも mkcert のルート証明書 (`mkcert -CAROOT` のフォルダの `rootCA.pem`) を入れて信頼させます。
+- iPhone: ファイルを送って「プロファイル」として入れ、設定 → 一般 → 情報 → 証明書信頼設定 でオン
+- Android: 設定 → セキュリティ → 暗号化と認証情報 → 証明書のインストール → CA 証明書
+
+### nginx (1 回だけ)
+
+```nginx
 server {
     listen 8443 ssl;
-    server_name 192.168.171.12;
+    server_name 192.168.x.x;
 
-    ssl_certificate     /home/WiredMarks/projects/shio-walk/192.168.171.12.pem;
-    ssl_certificate_key /home/WiredMarks/projects/shio-walk/192.168.171.12-key.pem;
+    ssl_certificate     /home/<ユーザー>/.local/share/shio-walk-certs/192.168.x.x.pem;
+    ssl_certificate_key /home/<ユーザー>/.local/share/shio-walk-certs/192.168.x.x-key.pem;
 
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;     # shadow-cljs のホットリロード用 (WebSocket)
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
     }
 }
+```
 
-server {
-    listen 3443 ssl;
-    server_name 192.168.171.12;
-
-    ssl_certificate     /home/WiredMarks/projects/shio-walk/192.168.171.12.pem;
-    ssl_certificate_key /home/WiredMarks/projects/shio-walk/192.168.171.12-key.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-EOF
-
+```bash
+sudo tee /etc/nginx/sites-available/shio-walk   # 上の内容
 sudo ln -sf /etc/nginx/sites-available/shio-walk /etc/nginx/sites-enabled/
-sudo nginx -t
+sudo nginx -t && sudo service nginx start
 ```
 
-### 3. api.cljs のURLをスマートフォン用に設定
+スマホで `https://192.168.x.x:8443` を開きます。
 
-`frontend/src/shio_walk/api.cljs` の1行目を変更：
+Chromebook の Linux 環境では、外から 8443 に届くように ChromeOS の設定 (設定 → デベロッパー → Linux → ポート転送) で 8443 を足します。
 
-```clojure
-(def api-base-url "https://192.168.171.12:3443/api")
-```
+## センサーの許可
 
----
+- iPhone (Safari): 「ウォーキング開始」をタップしたときの許可ダイアログで「許可」。出ないときは 設定 → Safari →「モーションと画面の向きへのアクセス」をオン。iPhone の Chrome や LINE 内のブラウザでは歩数センサーが動きません
+- Android (Chrome): 位置情報の許可を求められたら「許可」。加速度センサーは許可なしで使えます
 
-## 通常の起動手順（スマートフォンアクセス用）
+## ホーム画面に追加 (PWA)
 
-### ターミナル1: DB + バックエンド
+- iPhone: Safari の共有メニュー →「ホーム画面に追加」
+- Android: Chrome のメニュー →「ホーム画面に追加」(アプリとしてインストールするにはアイコン画像 `public/icons/` が必要。未作成)
 
-```bash
-cd ~/projects/shio-walk
+## 困ったとき
 
-# PostgreSQL起動
-docker compose up -d
-
-# バックエンド起動
-cd backend && ./run.sh
-```
-
-### ターミナル2: nginx + フロントエンド
-
-```bash
-# nginx起動
-sudo service nginx start
-
-# フロントエンド起動
-cd ~/projects/shio-walk/frontend
-npx shadow-cljs watch app
-```
-
-### 動作確認
-
-```bash
-# バックエンド確認
-curl http://localhost:3000/api/health
-
-# nginx経由確認
-curl -k https://192.168.171.12:3443/api/health
-```
-
----
-
-## スマートフォンからのアクセス手順
-
-### 初回のみ: API証明書を信頼
-
-iPhoneのSafariで以下にアクセスし、証明書を信頼する：
-
-```
-https://192.168.171.12:3443/api/health
-```
-
-「このWebサイトは信頼できません」→「詳細を表示」→「このWebサイトを表示」
-
-### アプリにアクセス
-
-```
-https://192.168.171.12:8443
-```
-
----
-
-## PC単体での開発時
-
-`frontend/src/shio_walk/api.cljs` のURLをlocalhostに戻す：
-
-```clojure
-(def api-base-url "http://localhost:3000/api")
-```
-
-nginx は不要。shadow-cljs の http-host は `"0.0.0.0"` のままで問題なし。
-
-起動手順：
-
-```bash
-# DB起動
-docker compose up -d
-
-# バックエンド
-cd backend && ./run.sh
-
-# フロントエンド
-cd frontend && npx shadow-cljs watch app
-
-# アクセス
-# http://localhost:8080
-```
-
----
-
-## iOSでのセンサー設定
-
-DeviceMotion API（歩数センサー）を使用するには：
-
-1. iPhoneの「設定」アプリを開く
-2. 「Safari」を選択
-3. 「モーションと画面の向きへのアクセス」をオンにする
-4. Safariでアプリを再読み込み
-5. 「センサー計測を開始」ボタンをタップ → パーミッションダイアログが表示される
-
-> **注意**: iOSのChromeではDeviceMotion APIは動作しない。必ずSafariを使用すること。
-
----
-
-## Git ブランチ運用
-
-```
-main                    ← 安定版
-  └─ feature/pwa-sensor ← PWA・センサー実装（現在の開発ブランチ）
-```
-
-### ブランチ操作
-
-```bash
-# 現在のブランチ確認
-git branch
-
-# ブランチ切り替え
-git checkout main
-git checkout feature/pwa-sensor
-
-# 変更をコミット・プッシュ
-git add .
-git commit -m "メッセージ"
-git push
-
-# feature をmainにマージ（動作確認後）
-git checkout main
-git merge feature/pwa-sensor
-git push
-```
-
----
-
-## トラブルシューティング
-
-| 症状 | 原因 | 対処 |
-|------|------|------|
-| APIに接続できない | DBが起動していない | `docker compose up -d` |
-| ポート8443に接続できない | nginxが停止している | `sudo service nginx start` |
-| Safariでログインできない | API証明書が未信頼 | `https://192.168.171.12:3443/api/health` にアクセスして信頼 |
-| 歩数が増えない（iOS） | センサー設定がオフ | 設定→Safari→モーションへのアクセスをオン |
-| 歩数が増えない（Android） | パーミッション未付与 | 「センサー計測を開始」ボタンをタップ |
-| ウォーク画面が戻る | 状態競合 | DBをリセット: `docker exec -it shio-walk-db psql -U shio_user -d shio_walk -c "TRUNCATE TABLE walks, user_stats, user_rewards CASCADE;"` |
-
----
-
-## 関連ドキュメント
-
-- [開発メモ](docs/debug-notes.md)
-- [API仕様](docs/api.md)
-- [デバッグ引き継ぎ](docs/debugging-handover.json)
-- [LLM引き継ぎ](docs/next-llm-handover.json)
+| 症状 | 確かめること |
+|---|---|
+| API につながらない | `docker compose up -d`、バックエンドが起動しているか (`curl localhost:3000/api/health`)、開発サーバー経由 (`curl localhost:8080/api/health`) |
+| 画面が古いまま | Service Worker はネットワーク優先なので再読み込みで新しくなる。だめならブラウザのサイトデータを消す |
+| 歩数が増えない (iPhone) | 上の「センサーの許可」 |
+| 画面を消すと計測が止まる | ブラウザの制約 (docs/STATUS.md)。戻ったときに自動で保存し、そこから数え足す |
+| 開始したウォークが一覧で戻る | docs/debug-notes.md の「状態の競合」。データを片付けるなら `cd backend && clj -M:reset` |
