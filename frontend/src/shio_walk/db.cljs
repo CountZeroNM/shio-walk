@@ -24,4 +24,6 @@
             :geo-supported?    nil    ;; Geolocation 対応か
             :motion-denied?    false  ;; パーミッション拒否
             :geo-denied?       false
+            :wake-lock?        false   ;; 画面を点けたままにしているか
+            :wake-lock-error   nil
             :error             nil}})

@@ -350,6 +350,15 @@
 ;; 隠れている間はセンサーが止まることが多いので、隠れる直前の保存が大事 (core.cljs で登録)
 (rf/reg-event-fx
  :app-visibility-changed
- (fn [{:keys [db]} [_ _visible?]]
+ (fn [{:keys [db]} [_ visible?]]
    (when (get-in db [:sensor :active?])
-     {:dispatch [:sync-sensor-data]})))
+     (cond-> {:dispatch [:sync-sensor-data]}
+       ;; 隠れるとブラウザが画面点灯の維持を解除するので、戻ったら取り直す
+       visible? (assoc :wake-lock true)))))
+
+(rf/reg-event-db
+ :wake-lock-changed
+ (fn [db [_ on? err]]
+   (-> db
+       (assoc-in [:sensor :wake-lock?] on?)
+       (assoc-in [:sensor :wake-lock-error] err))))

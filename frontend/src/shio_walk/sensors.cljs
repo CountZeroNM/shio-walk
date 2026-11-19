@@ -27,6 +27,8 @@ iOS Safari対応強化版"
 
 (defonce geo-watch-id (atom nil))
 
+(defonce wake-lock (atom nil))   ;; WakeLockSentinel (画面を点けたままにする)
+
 ;; ============================================================
 ;; 歩数計算
 ;; ============================================================
@@ -222,6 +224,45 @@ a (+ (* (js/Math.sin (/ dphi 2))
   (rf/dispatch [:sensor-gps-stopped])))
 
 ;; ============================================================
+;; Wake Lock (計測中は画面を点けたままにする)
+;; ============================================================
+;; 画面が消えるとセンサーも GPS も止まるので、計測中は画面を消さない。
+;; 画面が隠れると (アプリの切り替え・電源ボタン) ブラウザが自動で解除するので、
+;; 戻ったときにもう一度取る (events.cljs の :app-visibility-changed → :wake-lock 効果)。
+
+(defn request-wake-lock! []
+  (cond
+    (not (and (exists? js/navigator) (exists? js/navigator.wakeLock)))
+    (rf/dispatch [:wake-lock-changed false "この端末・ブラウザは画面点灯の維持に非対応"])
+
+    (or (some? @wake-lock)
+        (not (exists? js/document))
+        (not= "visible" (.-visibilityState js/document)))
+    nil
+
+    :else
+    (-> (.request js/navigator.wakeLock "screen")
+        (.then (fn [sentinel]
+                 (reset! wake-lock sentinel)
+                 (.addEventListener sentinel "release"
+                                    (fn []
+                                      (when (identical? @wake-lock sentinel) (reset! wake-lock nil))
+                                      (rf/dispatch [:wake-lock-changed false nil])))
+                 (rf/dispatch [:wake-lock-changed true nil])))
+        (.catch (fn [e]
+                  (rf/dispatch [:wake-lock-changed false (str "画面点灯の維持に失敗: " (.-message e))]))))))
+
+(defn release-wake-lock! []
+  (when-let [sentinel @wake-lock]
+    (reset! wake-lock nil)
+    (.release sentinel)))
+
+(rf/reg-fx
+ :wake-lock
+ (fn [on?]
+   (if on? (request-wake-lock!) (release-wake-lock!))))
+
+;; ============================================================
 ;; センサー統合
 ;; ============================================================
 
@@ -231,9 +272,11 @@ a (+ (* (js/Math.sin (/ dphi 2))
 ;; 必ずユーザークリックイベントから呼ぶこと
 
  (start-step-counter!)
- (start-gps!))
+ (start-gps!)
+ (request-wake-lock!))
 
 (defn stop-sensors! []
 
  (stop-step-counter!)
- (stop-gps!))
+ (stop-gps!)
+ (release-wake-lock!))

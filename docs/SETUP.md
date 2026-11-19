@@ -23,6 +23,14 @@ PC 側はどちらも README の「動かし方」と同じです (DB・バッ�
 3. スマホの Chrome で `http://localhost:8080` を開く
 
 Chromebook の Linux 環境で開発しているときは、USB 機器を Linux に渡す設定 (設定 → デベロッパー → Linux → USB 機器) が必要です。
+adb が無ければ `sudo apt install adb`。スマホ側で「USB デバッグを許可しますか」と出たら許可します。
+
+## A'. Android: Wi-Fi 越しに http のまま「安全」と扱わせる (ケーブルも証明書も要らない・開発用)
+
+Android の Chrome で `chrome://flags/#unsafely-treat-insecure-origin-as-secure` を開き、
+`http://192.168.x.x:8080` (PC の IP) を入れて Enabled にし、Chrome を再起動します。その Origin だけ https と同じに扱われ、センサーと GPS が使えます。
+PC の 8080 にスマホから届く必要があります (Chromebook の Linux 環境なら、設定 → デベロッパー → Linux → ポート転送 で 8080 を足す)。
+この設定は開発用です。普段使いのブラウザで不要になったら戻してください。
 
 ## B. Wi-Fi 越しに https で開く (iPhone も同じ方法)
 
@@ -82,7 +90,13 @@ Chromebook の Linux 環境では、外から 8443 に届くように ChromeOS �
 ## ホーム画面に追加 (PWA)
 
 - iPhone: Safari の共有メニュー →「ホーム画面に追加」
-- Android: Chrome のメニュー →「ホーム画面に追加」(アプリとしてインストールするにはアイコン画像 `public/icons/` が必要。未作成)
+- Android: Chrome のメニュー →「ホーム画面に追加」または「アプリをインストール」(アイコンは `scripts/make_icons.py` で作った仮のもの)
+
+## 計測中の画面
+
+- 計測中は画面を点けたままにします (Wake Lock。状態の表示に「画面点灯」)。画面が消えるとブラウザがセンサーと GPS を止めるためです
+- ポケットに入れるときは「🔒 ポケットモード」: 画面を黒くし、タッチを受け付けません。1 秒の長押しで戻ります
+- 電源ボタンで画面を消したり、別のアプリに切り替えたりすると計測は止まります。戻ったときに自動で保存し、そこから数え足します
 
 ## 困ったとき
 

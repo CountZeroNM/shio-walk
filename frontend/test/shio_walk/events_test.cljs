@@ -59,3 +59,21 @@
   (is (= {:steps 12 :distance-meters 34.5}
          (shio-walk.events/walk-values {:steps 12 :distance-meters 34.5})))
   (is (= {:steps 0 :distance-meters 0} (shio-walk.events/walk-values {}))))
+
+(deftest wake-lock-state
+  (d! :wake-lock-changed true nil)
+  (is (true? (get-in @rdb/app-db [:sensor :wake-lock?])))
+  (d! :wake-lock-changed false "非対応")
+  (is (false? (get-in @rdb/app-db [:sensor :wake-lock?])))
+  (is (= "非対応" (get-in @rdb/app-db [:sensor :wake-lock-error]))))
+
+(deftest wake-lock-requested-again-when-visible
+  (let [calls (atom [])]
+    (rf/reg-fx :wake-lock #(swap! calls conj %))
+    (d! :app-visibility-changed true)
+    (is (= [] @calls) "計測していなければ何もしない")
+    (swap! rdb/app-db assoc-in [:sensor :active?] true)
+    (d! :app-visibility-changed false)
+    (is (= [] @calls) "隠れるときは取らない (ブラウザが解除する)")
+    (d! :app-visibility-changed true)
+    (is (= [true] @calls) "戻ったら取り直す")))

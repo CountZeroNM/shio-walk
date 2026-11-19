@@ -41,6 +41,12 @@
 (rf/reg-sub :sensor/geo-denied?
   (fn [db _] (get-in db [:sensor :geo-denied?])))
 
+(rf/reg-sub :sensor/wake-lock?
+  (fn [db _] (get-in db [:sensor :wake-lock?])))
+
+(rf/reg-sub :sensor/wake-lock-error
+  (fn [db _] (get-in db [:sensor :wake-lock-error])))
+
 (rf/reg-sub :sensor/error
   (fn [db _] (get-in db [:sensor :error])))
 

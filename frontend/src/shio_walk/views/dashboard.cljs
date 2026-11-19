@@ -67,7 +67,9 @@
         geo-supported?   @(rf/subscribe [:sensor/geo-supported?])
         motion-denied?   @(rf/subscribe [:sensor/motion-denied?])
         geo-denied?      @(rf/subscribe [:sensor/geo-denied?])
-        sensor-error     @(rf/subscribe [:sensor/error])]
+        sensor-error     @(rf/subscribe [:sensor/error])
+        wake-lock?       @(rf/subscribe [:sensor/wake-lock?])
+        wake-lock-error  @(rf/subscribe [:sensor/wake-lock-error])]
     [:div {:style {:display "flex"
                    :gap "8px"
                    :flex-wrap "wrap"
@@ -79,9 +81,15 @@
      [sensor-badge "GPS"
       (and sensor-active? geo-supported?)
       geo-denied?]
+     [sensor-badge "画面点灯"
+      (and sensor-active? wake-lock?)
+      (and sensor-active? (some? wake-lock-error))]
      (when sensor-error
        [:span {:style {:font-size "0.75em" :color "#ef4444"}}
-        (str "⚠ " sensor-error)])]))
+        (str "⚠ " sensor-error)])
+     (when (and sensor-active? wake-lock-error)
+       [:span {:style {:font-size "0.75em" :color "#b45309"}}
+        (str "⚠ " wake-lock-error "。画面が消えると計測が止まります")])]))
 
 ;; ============================================================
 ;; センサー計測中の表示
@@ -128,6 +136,41 @@
         "⚠ センサーへのアクセスが拒否されています。"
         [:br]
         "ブラウザの設定からセンサー権限を許可してください。"])]))
+
+;; ============================================================
+;; ポケットモード
+;; ============================================================
+;; 計測中は画面を点けたままにする (Wake Lock) ので、ポケットに入れると誤タッチが起きる。
+;; 画面全体を黒い覆いでふさぎ、1 秒の長押しでだけ戻れるようにする。
+;; 黒い画面は有機 EL の端末では電池の減りも少ない。
+(defonce pocket-mode? (r/atom false))
+
+(defn pocket-overlay []
+  (let [timer (atom nil)
+        cancel! #(when-let [t @timer] (js/clearTimeout t) (reset! timer nil))]
+    (fn []
+      (when @pocket-mode?
+        (let [walk @(rf/subscribe [:current-walk])]
+          [:div {:style {:position "fixed" :inset 0 :z-index 1000
+                         :background "#000" :color "#444"
+                         :display "flex" :flex-direction "column"
+                         :align-items "center" :justify-content "center"
+                         :user-select "none" :touch-action "none"
+                         :-webkit-user-select "none"}
+                 :on-context-menu #(.preventDefault %)
+                 :on-pointer-down (fn [_]
+                                    (cancel!)
+                                    (reset! timer (js/setTimeout #(do (reset! timer nil)
+                                                                      (reset! pocket-mode? false))
+                                                                 1000)))
+                 :on-pointer-up cancel!
+                 :on-pointer-leave cancel!
+                 :on-pointer-cancel cancel!}
+           [:div {:style {:font-size "3em" :font-weight "700"}} (:steps walk)]
+           [:div {:style {:font-size "1.2em" :margin-top "4px"}}
+            (str (.toFixed (/ (or (:distance-meters walk) 0) 1000) 2) " km")]
+           [:div {:style {:font-size "0.8em" :margin-top "32px"}}
+            "計測中。長押し (1 秒) で戻る"]])))))
 
 ;; ============================================================
 ;; 手動入力
@@ -186,6 +229,9 @@
           ;; --- センサー計測表示 (デフォルト) ---
           [:div
            [sensor-live-display]
+           [:button {:on-click #(reset! pocket-mode? true)
+                     :style {:width "100%" :background "#111827" :color "#e5e7eb"}}
+            "🔒 ポケットモード (画面を黒くして誤タッチを防ぐ)"]
            [:p {:style {:font-size "0.8em"
                         :color "#9ca3af"
                         :text-align "center"
@@ -328,6 +374,7 @@
 ;; ============================================================
 (defn dashboard-page []
   [:div
+   [pocket-overlay]
    [header]
    [stats-panel]
    [walk-control]
