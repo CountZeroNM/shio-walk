@@ -170,20 +170,16 @@ a (+ (* (js/Math.sin (/ dphi 2))
 ;; GPS
 ;; ============================================================
 
+(def GPS-MAX-ACCURACY 30)   ;; m。これより誤差の大きい点は使わない
+
 (defn- geo-success-handler [position]
-
  (let [coords (.-coords position)
-
-       lat (.-latitude coords)
-       lon (.-longitude coords)
-       acc (.-accuracy coords)]
-
-;; 精度フィルタ
-  (when (< acc 30)
-
-   (rf/dispatch
-    [:sensor-position-updated
-     {:lat lat :lon lon :accuracy acc}]))))
+       fix    {:lat (.-latitude coords) :lon (.-longitude coords) :accuracy (.-accuracy coords)}]
+  ;; 確かめ用: 使わない点も含めて、届いた点を画面へ
+  (rf/dispatch [:sensor-gps-fix fix])
+  ;; 精度フィルタ
+  (when (< (:accuracy fix) GPS-MAX-ACCURACY)
+   (rf/dispatch [:sensor-position-updated fix]))))
 
 (defn- geo-error-handler [error]
 

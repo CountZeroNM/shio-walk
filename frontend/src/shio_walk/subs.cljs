@@ -60,3 +60,8 @@
  :sensor/diag
  (fn [db _]
    (get-in db [:sensor :diag])))
+
+(rf/reg-sub
+ :sensor/gps-diag
+ (fn [db _]
+   (select-keys (:sensor db) [:gps-fix :gps-fixes :last-position])))

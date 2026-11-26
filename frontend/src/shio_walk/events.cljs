@@ -218,6 +218,7 @@
               (assoc-in [:sensor :base-steps] (or (:steps walk) 0))
               (assoc-in [:sensor :base-distance-meters] (or (:distance-meters walk) 0))
               (assoc-in [:sensor :last-position] nil)
+              (update :sensor dissoc :gps-fix :gps-fixes :diag)
               (assoc-in [:sensor :error] nil))})))
 
 (rf/reg-event-db
@@ -268,6 +269,14 @@
          (cond-> walk-id
            (assoc-in [:current-walk :distance-meters]
                      (js/Math.round (+ (get-in db [:sensor :base-distance-meters] 0) new-dist))))))))
+
+;; 確かめ用: GPS から届いた最新の点と、届いた数 (精度で捨てた点も含む)
+(rf/reg-event-db
+ :sensor-gps-fix
+ (fn [db [_ fix]]
+   (-> db
+       (assoc-in [:sensor :gps-fix] fix)
+       (update-in [:sensor :gps-fixes] (fnil inc 0)))))
 
 ;; 確かめ用: 加速度のイベントの数 (回/秒) と揺れの最大 (sensors.cljs の motion-handler)
 (rf/reg-event-db

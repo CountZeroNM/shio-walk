@@ -132,6 +132,25 @@
           no-data?  "加速度: イベントは来るが値が空"
           :else     (str "加速度 " hz " 回/秒・揺れ " (.toFixed peak 1)
                          " (1 歩のしきい値 " sensors/STEP-HIGH ")"))])
+     (let [{:keys [gps-fix gps-fixes last-position]} @(rf/subscribe [:sensor/gps-diag])
+           acc (:accuracy gps-fix)]
+       [:div {:style {:font-size "0.7em" :color "#9ca3af" :text-align "center"}}
+        (cond
+          (nil? gps-fix)
+          "GPS: まだ位置が届いていません"
+
+          (>= acc sensors/GPS-MAX-ACCURACY)
+          (str "GPS 誤差 ±" (js/Math.round acc) " m (" gps-fixes " 回): 誤差が "
+               sensors/GPS-MAX-ACCURACY " m 以上なので使っていません。屋外で")
+
+          :else
+          (let [moved (if last-position
+                        (sensors/haversine-distance (:lat last-position) (:lon last-position)
+                                                    (:lat gps-fix) (:lon gps-fix))
+                        0)
+                need  (max sensors/GPS-MIN-MOVE acc (or (:accuracy last-position) 0))]
+            (str "GPS 誤差 ±" (js/Math.round acc) " m (" gps-fixes " 回)・前に数えた点から "
+                 (js/Math.round moved) " m (" (js/Math.round need) " m を越えたら足す)")))])
      ;; パーミッション拒否時の案内
      (when (or motion-denied? geo-denied?)
        [:div {:style {:margin-top "12px"
