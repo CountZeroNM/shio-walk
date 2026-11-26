@@ -256,22 +256,24 @@
 (rf/reg-event-db
  :sensor-position-updated
  (fn [db [_ {:keys [lat lon accuracy]}]]
-   (let [last-pos  (get-in db [:sensor :last-position])
-         prev-dist (get-in db [:sensor :distance-meters] 0)
-         new-dist  (if last-pos
-                     (+ prev-dist
-                        (sensors/haversine-distance
-                         (:lat last-pos) (:lon last-pos)
-                         lat lon))
-                     prev-dist)
+   ;; :last-position は距離を数えた最後の点 (起点)。揺れの分は足さない (sensors/gps-update)
+   (let [[anchor added] (sensors/gps-update (get-in db [:sensor :last-position])
+                                            {:lat lat :lon lon :accuracy accuracy})
+         new-dist  (+ (get-in db [:sensor :distance-meters] 0) added)
          walk-id   (get-in db [:current-walk :id])]
      (-> db
-         (assoc-in [:sensor :last-position] {:lat lat :lon lon :accuracy accuracy})
+         (assoc-in [:sensor :last-position] anchor)
          (assoc-in [:sensor :distance-meters] new-dist)
          ;; current-walk にも反映
          (cond-> walk-id
            (assoc-in [:current-walk :distance-meters]
                      (js/Math.round (+ (get-in db [:sensor :base-distance-meters] 0) new-dist))))))))
+
+;; 確かめ用: 加速度のイベントの数 (回/秒) と揺れの最大 (sensors.cljs の motion-handler)
+(rf/reg-event-db
+ :sensor-diag
+ (fn [db [_ d]]
+   (assoc-in db [:sensor :diag] d)))
 
 ;; GPS 開始通知
 (rf/reg-event-db

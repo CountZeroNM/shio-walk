@@ -6,77 +6,73 @@ iOS Safari対応強化版"
  (:require [re-frame.core :as rf]))
 
 ;; ============================================================
-;; 定数
+;; 歩数の判定 (加速度)
 ;; ============================================================
+;; 加速度の大きさ |a| から、ゆっくり追う平均 (重力の分) を引いた「揺れ」を見る。
+;; 揺れが STEP-HIGH を越えたら 1 歩、STEP-LOW を下回るまで次の歩を数えない (ヒステリシス)。
+;; 重力の分は平均で求めるので、accelerationIncludingGravity が無く acceleration だけの端末でも動く。
 
-(def GRAVITY 9.81)
+(def STEP-HIGH 1.0)          ;; m/s^2。これを越えたら 1 歩
+(def STEP-LOW 0.0)           ;; これを下回ったら次の歩を数えられる
+(def STEP-MIN-MS 300)        ;; 歩と歩の最短の間隔 (1 秒に 3.3 歩まで。速歩きでも 2.5 歩程度)
+(def GRAVITY-ALPHA 0.02)     ;; 重力の分を追う速さ (小さいほどゆっくり)
+(def SMOOTH-ALPHA 0.35)      ;; 揺れのノイズを均す強さ
 
-(def STEP-THRESHOLD 1.3)
-
-(def STEP-DEBOUNCE-MS 280)
-
-(def SMOOTHING-FACTOR 0.15)
+(defn step-update
+  "加速度の大きさ mag (m/s^2) と時刻 t (ms) を 1 つ受け取り、[新しい状態 歩いたか] を返す。純粋関数。
+  状態は {:gravity 平均 :dyn 揺れ :armed? 次の歩を数えられるか :last-step 前の歩の時刻}"
+  [{:keys [gravity dyn armed? last-step] :or {armed? true last-step 0}} mag t]
+  (let [gravity (if gravity (+ gravity (* GRAVITY-ALPHA (- mag gravity))) mag)
+        dyn     (+ (or dyn 0) (* SMOOTH-ALPHA (- (- mag gravity) (or dyn 0))))
+        step?   (and armed? (> dyn STEP-HIGH) (> (- t last-step) STEP-MIN-MS))
+        armed?  (cond step? false
+                      (< dyn STEP-LOW) true
+                      :else armed?)]
+    [{:gravity gravity :dyn dyn :armed? armed? :last-step (if step? t last-step)}
+     step?]))
 
 ;; ============================================================
 ;; 状態
 ;; ============================================================
 
-(defonce last-step-time (atom 0))
-(defonce smoothed-magnitude (atom 0.0))
-(defonce was-below-threshold (atom true))
+(defonce step-state (atom {}))
+;; 確かめ用: 1 秒ごとに、届いた加速度のイベントの数と揺れの最大を画面へ送る
+(defonce diag (atom {:events 0 :peak 0 :since 0}))
 
 (defonce geo-watch-id (atom nil))
 
 (defonce wake-lock (atom nil))   ;; WakeLockSentinel (画面を点けたままにする)
 
-;; ============================================================
-;; 歩数計算
-;; ============================================================
+(defn- magnitude [v]
+  (when (and v (some? (.-x v)))
+    (let [x (or (.-x v) 0) y (or (.-y v) 0) z (or (.-z v) 0)]
+      (js/Math.sqrt (+ (* x x) (* y y) (* z z))))))
 
 (defn- motion-handler [event]
-
- (let [acc (.-accelerationIncludingGravity event)
-
-       x (or (.-x acc) 0)
-       y (or (.-y acc) 0)
-       z (or (.-z acc) 0)
-
-       raw-mag (js/Math.sqrt (+ (* x x) (* y y) (* z z)))
-
-;; 重力除去
-       linear-mag (js/Math.abs (- raw-mag GRAVITY))
-
-;; ローパス
-       smoothed (+ (* SMOOTHING-FACTOR linear-mag)
-                 (* (- 1 SMOOTHING-FACTOR) @smoothed-magnitude))
-
-       now (js/Date.now)]
-
-  (reset! smoothed-magnitude smoothed)
-
-  (if (> smoothed STEP-THRESHOLD)
-
-   (when (and @was-below-threshold
-          (> (- now @last-step-time) STEP-DEBOUNCE-MS))
-
-    (reset! last-step-time now)
-    (reset! was-below-threshold false)
-
-    (rf/dispatch [:sensor-step-detected]))
-
-   (reset! was-below-threshold true))))
+  (let [now (js/Date.now)
+        mag (or (magnitude (.-accelerationIncludingGravity event))
+                (magnitude (.-acceleration event)))]
+    (when mag
+      (let [[st step?] (step-update @step-state mag now)]
+        (reset! step-state st)
+        (when step? (rf/dispatch [:sensor-step-detected]))
+        (swap! diag (fn [d] (-> d (update :events inc) (update :peak max (:dyn st)))))))
+    (let [{:keys [events peak since]} @diag]
+      (when (>= (- now since) 1000)
+        (reset! diag {:events 0 :peak 0 :since now})
+        (rf/dispatch [:sensor-diag {:hz (js/Math.round (/ (* 1000 events) (max 1 (- now since))))
+                                    :peak peak
+                                    :no-data? (nil? mag)}])))))
 
 ;; ============================================================
 ;; Motion Sensor
 ;; ============================================================
 
 (defn- attach-motion-listener! []
-
- (reset! smoothed-magnitude 0.0)
- (reset! was-below-threshold true)
-
+ (reset! step-state {})
+ (reset! diag {:events 0 :peak 0 :since (js/Date.now)})
+ (.removeEventListener js/window "devicemotion" motion-handler)
  (.addEventListener js/window "devicemotion" motion-handler)
-
  (rf/dispatch [:sensor-permission-granted :motion]))
 
 (defn start-step-counter! []
@@ -126,11 +122,8 @@ iOS Safari対応強化版"
   (attach-motion-listener!)))
 
 (defn stop-step-counter! []
-
  (.removeEventListener js/window "devicemotion" motion-handler)
-
- (reset! smoothed-magnitude 0.0)
- (reset! was-below-threshold true))
+ (reset! step-state {}))
 
 ;; append
 
@@ -158,6 +151,20 @@ a (+ (* (js/Math.sin (/ dphi 2))
 (js/Math.sqrt (- 1 a))))))
 
 
+
+;; GPS の揺れ対策: 止まっていても位置は数 m〜十数 m 揺れる。前に数えた点 (起点) から、
+;; 精度 (誤差の半径) と GPS-MIN-MOVE の大きい方より離れたときだけ距離を足し、起点を進める。
+(def GPS-MIN-MOVE 10)   ;; m
+
+(defn gps-update
+  "起点 anchor ({:lat :lon :accuracy} か nil) と新しい位置 pos から [新しい起点 足す距離(m)] を返す。純粋関数。"
+  [anchor {:keys [lat lon accuracy] :as pos}]
+  (if-not anchor
+    [pos 0]
+    (let [d (haversine-distance (:lat anchor) (:lon anchor) lat lon)]
+      (if (> d (max GPS-MIN-MOVE (or accuracy 0) (or (:accuracy anchor) 0)))
+        [pos d]
+        [anchor 0]))))
 
 ;; ============================================================
 ;; GPS

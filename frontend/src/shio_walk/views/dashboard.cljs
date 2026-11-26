@@ -124,6 +124,14 @@
         (.toFixed (/ dist-m 1000) 3)]
        [:div {:style {:font-size "0.8em" :color "#6b7280" :margin-top "4px"}}
         (if geo-denied? "km（GPS無効）" "📍 km（GPS）")]]]
+     ;; 確かめ用: 加速度が届いているか・どのくらい揺れているか (しきい値と比べる)
+     (let [{:keys [hz peak no-data?]} @(rf/subscribe [:sensor/diag])]
+       [:div {:style {:margin-top "8px" :font-size "0.7em" :color "#9ca3af" :text-align "center"}}
+        (cond
+          (nil? hz) "加速度: まだ届いていません"
+          no-data?  "加速度: イベントは来るが値が空"
+          :else     (str "加速度 " hz " 回/秒・揺れ " (.toFixed peak 1)
+                         " (1 歩のしきい値 " sensors/STEP-HIGH ")"))])
      ;; パーミッション拒否時の案内
      (when (or motion-denied? geo-denied?)
        [:div {:style {:margin-top "12px"

@@ -55,3 +55,8 @@
   (fn [db _]
     (or (get-in db [:sensor :motion-supported?])
         (get-in db [:sensor :geo-supported?]))))
+
+(rf/reg-sub
+ :sensor/diag
+ (fn [db _]
+   (get-in db [:sensor :diag])))

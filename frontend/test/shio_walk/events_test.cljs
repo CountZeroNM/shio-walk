@@ -5,7 +5,8 @@
             [re-frame.core :as rf]
             [re-frame.db :as rdb]
             [shio-walk.db :as db]
-            [shio-walk.events]))
+            [shio-walk.events]
+            [shio-walk.sensors :as sensors]))
 
 ;; node には window が無い。センサーの登録・解除 (sensors.cljs) は何もしない代用品にする
 (when-not (exists? js/window)
@@ -77,3 +78,53 @@
     (is (= [] @calls) "隠れるときは取らない (ブラウザが解除する)")
     (d! :app-visibility-changed true)
     (is (= [true] @calls) "戻ったら取り直す")))
+
+;; ---- 歩数の判定・GPS の揺れ (sensors の純粋関数) ----
+
+(defn- count-steps
+  "加速度の大きさの列 (60 Hz) を step-update に通して、数えた歩数を返す"
+  [mags]
+  (->> (map-indexed vector mags)
+       (reduce (fn [[st n] [i mag]]
+                 (let [[st' step?] (sensors/step-update st mag (* i (/ 1000 60)))]
+                   [st' (if step? (inc n) n)]))
+               [{} 0])
+       second))
+
+(defn- noise
+  "決まった並びの擬似乱数 (-amp 〜 +amp)"
+  [amp n]
+  (->> (iterate #(mod (+ (* % 1103515245) 12345) 2147483648) 42)
+       rest (take n)
+       (map #(* amp (- (* 2 (/ % 2147483648)) 1)))))
+
+(defn- walking
+  "base に、1 秒に hz 歩・振幅 amp の揺れとノイズを足した secs 秒分"
+  [base hz amp secs]
+  (map (fn [i nz] (+ base (* amp (js/Math.sin (* 2 js/Math.PI hz (/ i 60)))) nz))
+       (range (* 60 secs)) (noise 0.3 (* 60 secs))))
+
+(deftest step-detector
+  (testing "1 秒に 2 歩で 10 秒歩く → 約 20 歩"
+    (is (<= 18 (count-steps (walking 9.81 2 2.5 10)) 21)))
+  (testing "ポケットの中のように揺れが大きくても二重に数えない"
+    (is (<= 18 (count-steps (walking 9.81 2 6 10)) 21)))
+  (testing "置いたまま (ノイズだけ) は数えない"
+    (is (= 0 (count-steps (map #(+ 9.81 %) (noise 0.3 600)))))))
+
+(deftest gps-jitter-ignored
+  (let [p0 {:lat 35.0 :lon 139.0 :accuracy 12}
+        near {:lat 35.00005 :lon 139.0 :accuracy 12}   ;; 約 5.6 m: 揺れ
+        far  {:lat 35.0003 :lon 139.0 :accuracy 12}]   ;; 約 33 m: 動いた
+    (is (= [p0 0] (sensors/gps-update nil p0)) "最初の点は起点にするだけ")
+    (is (= [p0 0] (sensors/gps-update p0 near)) "誤差の範囲の揺れは足さない (起点もそのまま)")
+    (let [[anchor d] (sensors/gps-update p0 far)]
+      (is (= far anchor))
+      (is (< 32 d 35)))
+    (testing "揺れを何度くり返しても増えない"
+      (d! :walks-loaded {:walks [server-walk]})
+      (d! :start-sensors)
+      (doseq [p (take 20 (cycle [p0 near]))]
+        (d! :sensor-position-updated p))
+      (is (= 800 (:distance-meters (walk))))
+      (d! :stop-sensors))))
