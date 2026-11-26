@@ -32,6 +32,9 @@ Android の Chrome で `chrome://flags/#unsafely-treat-insecure-origin-as-secure
 PC の 8080 にスマホから届く必要があります (Chromebook の Linux 環境なら、設定 → デベロッパー → Linux → ポート転送 で 8080 を足す)。
 この設定は開発用です。普段使いのブラウザで不要になったら戻してください。
 
+開くと「付近のデバイスに接続しますか?」と出ます (同じ Wi-Fi の機器につなぐときの Chrome の確認)。「接続」を押すと Chrome のアプリ情報が開くので、**権限 → 付近のデバイス → 許可** にして戻り、再読み込みします。
+Chromebook 自身から `http://PCのIP:8080` は開けないことがありますが異常ではありません (確かめるなら `http://penguin.linux.test:8080`)。
+
 ## B. Wi-Fi 越しに https で開く (iPhone も同じ方法)
 
 mkcert でその PC の IP 用の証明書を作り、nginx で https にして 8080 へ転送します。
@@ -103,6 +106,7 @@ Chromebook の Linux 環境では、外から 8443 に届くように ChromeOS �
 | 症状 | 確かめること |
 |---|---|
 | API につながらない | `docker compose up -d`、バックエンドが起動しているか (`curl localhost:3000/api/health`)、開発サーバー経由 (`curl localhost:8080/api/health`) |
+| スマホで開けない (Wi-Fi) | Chrome の「付近のデバイス」の権限 (上の A')、Chromebook の IP が変わっていないか、ポート転送 8080 |
 | 画面が古いまま | Service Worker はネットワーク優先なので再読み込みで新しくなる。だめならブラウザのサイトデータを消す |
 | 歩数が増えない (iPhone) | 上の「センサーの許可」 |
 | 画面を消すと計測が止まる | ブラウザの制約 (docs/STATUS.md)。戻ったときに自動で保存し、そこから数え足す |
