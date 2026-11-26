@@ -10,6 +10,7 @@ Clojure (Ring/Compojure/next.jdbc/PostgreSQL) + ClojureScript (re-frame/shadow-c
 
 ## 動かし方・確認
 ```bash
+bb dev                                            # 下の DB・バックエンド・画面をまとめて起動 (bb.edn。bb tasks で一覧)
 docker compose up -d                              # DB (コンテナ shio-walk-db)
 cd backend && clj -M:migrate migrate && ./run.sh  # バックエンド :3000
 cd frontend && npx shadow-cljs watch app          # 画面 :8080 (/api/ は :3000 へ転送)

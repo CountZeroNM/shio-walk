@@ -1,0 +1,13 @@
+;; 開発用のタスク。リポジトリの直下で `bb tasks` で一覧、`bb dev` で全部起動。
+{:paths ["scripts"]
+ :tasks
+ {:requires ([dev])
+
+  dev     {:doc  "DB (docker) → バックエンド (:3000) → 画面 (:8080) をまとめて起動。Ctrl-C で両方止める"
+           :task (dev/dev!)}
+  db      {:doc  "DB だけ起動して、接続できるまで待つ"
+           :task (dev/db-up!)}
+  migrate {:doc  "マイグレーションを当てる (初回と、migrations にファイルが増えたとき)"
+           :task (dev/migrate!)}
+  test    {:doc  "バックエンド (DB shio_walk_test) と画面のテスト"
+           :task (dev/test!)}}}

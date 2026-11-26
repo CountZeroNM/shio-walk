@@ -52,6 +52,19 @@ shio-walk/
 
 ## 動かし方（PC で開発するとき）
 
+[babashka](https://babashka.org/) があれば、リポジトリの直下でまとめて起動できます（初回は先に `cd frontend && npm install`）。
+
+```bash
+bb dev        # DB を起動して待ち、バックエンド (:3000) と画面 (:8080) を起動。出力に [backend] [frontend] が付く。Ctrl-C で両方止まる
+bb migrate    # マイグレーション
+bb test       # テスト
+bb tasks      # 一覧
+```
+
+すでに 3000 や 8080 で動いているものは起動しません（片方だけ別の端末で動かしていても使える）。
+
+個別に起動するときは:
+
 ```bash
 # 1. DB
 docker compose up -d
